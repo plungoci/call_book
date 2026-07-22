@@ -6,8 +6,9 @@ from datetime import datetime, timezone
 from tkinter import messagebox, ttk
 from database import Database
 from models import OperatorProfile
-from services.location_service import (LocationDisabledError, LocationPermissionError,
-    LocationService, LocationTimeoutError, LocationUnavailableError)
+from services.location_service import (LocationDisabledError, LocationDnsError, LocationHttpError,
+    LocationInternetError, LocationPermissionError, LocationResponseError, LocationService,
+    LocationTimeoutError, LocationTlsError, LocationUnavailableError)
 from utils.maidenhead import coordinates_to_maidenhead
 from validators import normalize_callsign, normalize_name
 from .tooltip import Tooltip
@@ -33,7 +34,7 @@ class OperatorProfileWindow(tk.Toplevel):
         row=len(self.FIELDS)
         actions=ttk.Frame(content); actions.grid(row=row,column=0,columnspan=2,pady=(5,2))
         self.detect_button=ttk.Button(actions,text="Detectează locația",command=self.detect_location); self.detect_button.pack(side="left",padx=3)
-        Tooltip(self.detect_button,"Folosește serviciul de localizare al laptopului pentru a determina coordonatele și locatorul Maidenhead.")
+        Tooltip(self.detect_button,"Folosește Windows Location când este disponibil; altfel, cu acordul declanșat de acest buton, estimează poziția după adresa IP.")
         recalc=ttk.Button(actions,text="Recalculează locatorul",command=self.recalculate_locator); recalc.pack(side="left",padx=3)
         Tooltip(recalc,"Calculează locatorul Maidenhead folosind latitudinea și longitudinea introduse.")
         ttk.Label(content,text="Locația este utilizată local pentru calcularea locatorului Maidenhead.",foreground="#555555").grid(row=row+1,column=0,columnspan=2,sticky="w",pady=(2,4))
@@ -74,6 +75,11 @@ class OperatorProfileWindow(tk.Toplevel):
         if isinstance(exc,LocationDisabledError): text="Serviciul de localizare Windows este dezactivat.\n\nActivează:\nSetări Windows → Confidențialitate și securitate → Locație\n\nApoi încearcă din nou."
         elif isinstance(exc,LocationPermissionError): text="Permisiunea pentru localizare este refuzată. Permite accesul aplicațiilor la locație în setările Windows."
         elif isinstance(exc,LocationTimeoutError): text="Detectarea locației a durat prea mult. Verifică serviciile de localizare și încearcă din nou."
+        elif isinstance(exc,LocationDnsError): text="Nu se poate rezolva numele serviciului de localizare (eroare DNS). Verifică accesul la internet și DNS-ul."
+        elif isinstance(exc,LocationInternetError): text="Există rețea locală, dar serviciul de localizare nu poate fi atins. Verifică accesul real la internet, proxy-ul sau firewall-ul."
+        elif isinstance(exc,LocationTlsError): text="Conexiunea securizată la serviciul de localizare a eșuat deoarece certificatul TLS nu este valid."
+        elif isinstance(exc,LocationHttpError): text=f"Serviciul de localizare a răspuns cu o eroare HTTP.\n\n{exc}"
+        elif isinstance(exc,LocationResponseError): text=f"Serviciul de localizare a trimis un răspuns invalid.\n\n{exc}"
         elif isinstance(exc,LocationUnavailableError) and str(exc)=="Platformă nesuportată": text="Localizarea Windows nu este disponibilă pe această platformă. Poți introduce coordonatele manual."
         else: text="Locația nu a putut fi determinată.\n\nPoți introduce manual latitudinea și longitudinea, apoi poți apăsa „Recalculează locatorul”."
         messagebox.showerror("Localizare",text,parent=self)
