@@ -7,6 +7,12 @@ BAND_RANGES = ((1.8,2.0,"160m"),(3.5,4.0,"80m"),(5.25,5.45,"60m"),(7.0,7.3,"40m"
 CALLSIGN_RE = re.compile(r"^[A-Z0-9]+(?:/[A-Z0-9]+)*$")
 GRID_RE = re.compile(r"^[A-R]{2}[0-9]{2}(?:[A-X]{2})?(?:[0-9]{2})?$", re.I)
 def normalize_callsign(value: str) -> str: return value.strip().upper()
+def normalize_name(value: str) -> str:
+    """Collapse whitespace and title-case each operator-name word."""
+    return " ".join(value.split()).title()
+def format_name_input(value: str) -> str:
+    """Title-case while preserving one trailing space needed to type another word."""
+    return normalize_name(value) + (" " if value and value[-1].isspace() else "")
 def validate_callsign(value: str) -> str:
     value=normalize_callsign(value)
     if not value or not CALLSIGN_RE.fullmatch(value) or not any(c.isalpha() for c in value): raise ValueError("Indicativul este obligatoriu și poate conține litere, cifre și '/'.")
@@ -24,6 +30,7 @@ def parse_utc(value: str) -> datetime:
     return result
 def validate_qso(qso: QSO) -> QSO:
     qso.callsign=validate_callsign(qso.callsign)
+    qso.operator_name=normalize_name(qso.operator_name)
     if qso.frequency_mhz <= 0: raise ValueError("Frecvența trebuie să fie mai mare decât zero.")
     if not qso.mode.strip(): raise ValueError("Selectați un mod.")
     if qso.power_w is not None and qso.power_w <= 0: raise ValueError("Puterea trebuie să fie pozitivă.")

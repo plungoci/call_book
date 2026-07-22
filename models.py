@@ -16,3 +16,24 @@ class Repeater:
     name: str; output_frequency_mhz: float; id: Optional[int] = None
     input_frequency_mhz: Optional[float] = None; shift_mhz: Optional[float] = None
     tone_hz: Optional[float] = None; mode: str = ""; location: str = ""; grid_square: str = ""; notes: str = ""
+
+
+@dataclass(slots=True)
+class OperatorProfile:
+    """Personal details of the owner of this logbook."""
+
+    callsign: str = ""
+    full_name: str = ""
+    maidenhead_locator: str = ""
+    locality: str = ""
+    county: str = ""
+    country: str = ""
+    address: str = ""
+    email: str = ""
+    phone: str = ""
+    radio_equipment: str = ""
+    antenna: str = ""
+    default_power_w: Optional[float] = None
+    radio_club: str = ""
+    club_callsign: str = ""
+    notes: str = ""

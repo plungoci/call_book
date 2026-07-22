@@ -3,12 +3,12 @@ import tkinter as tk
 from datetime import datetime, timezone
 from tkinter import ttk
 from models import QSO
-from validators import band_for_frequency
+from validators import band_for_frequency, format_name_input, normalize_callsign
 from .tooltip import Tooltip
 MODES=("FM","AM","SSB","USB","LSB","CW","RTTY","FT8","FT4","PSK31","DIGITAL"); QSL=("NOT_SENT","SENT","RECEIVED","CONFIRMED")
 class QSOForm(ttk.LabelFrame):
- def __init__(self,parent,repeaters,on_save):
-  super().__init__(parent,text="QSO (toate orele sunt UTC)",padding=8);self.repeaters=repeaters;self.on_save=on_save;self.qso_id=None;self.vars={k:tk.StringVar() for k in ("callsign","operator_name","repeater","frequency_mhz","band","mode","rst_sent","rst_received","grid_square","power_w","qsl_status","qso_start_utc","qso_end_utc")};self._build();self.new()
+ def __init__(self,parent,repeaters,on_save,default_power_w=None):
+  super().__init__(parent,text="QSO (toate orele sunt UTC)",padding=8);self.repeaters=repeaters;self.on_save=on_save;self.default_power_w=default_power_w;self.qso_id=None;self.vars={k:tk.StringVar() for k in ("callsign","operator_name","repeater","frequency_mhz","band","mode","rst_sent","rst_received","grid_square","power_w","qsl_status","qso_start_utc","qso_end_utc")};self._formatting=False;self._build();self._bind_formatters();self.new()
  def _build(self):
   descriptions={
    "callsign":"Indicativul stației cu care ai realizat legătura.\nExemplu: YO8ABC",
@@ -34,6 +34,21 @@ class QSOForm(ttk.LabelFrame):
    elif key=="repeater":widget["values"]=["" ]+[f"{r['id']} — {r['name']}" for r in self.repeaters()];widget.bind("<<ComboboxSelected>>",self._repeater)
    widget.grid(row=i//2*2+1,column=i%2*2,sticky="ew",padx=3);setattr(self,key+"_widget",widget);Tooltip(widget,descriptions[key])
   ttk.Label(self,text="Observații").grid(row=14,column=0,sticky="w");self.notes=tk.Text(self,width=65,height=3);self.notes.grid(row=15,column=0,columnspan=4,sticky="ew",padx=3);Tooltip(self.notes,"Informații suplimentare despre QSO.")
+ def _bind_formatters(self):
+  """Format callsign and name immediately, retaining the insertion point."""
+  self.vars["callsign"].trace_add("write",lambda *_:self._format_var("callsign",self.callsign_widget,normalize_callsign))
+  self.vars["operator_name"].trace_add("write",lambda *_:self._format_var("operator_name",self.operator_name_widget,format_name_input))
+ def _format_var(self,key,widget,formatter):
+  if self._formatting:return
+  value=self.vars[key].get();formatted=formatter(value)
+  if value==formatted:return
+  cursor=widget.index(tk.INSERT) if widget.focus_get()==widget else len(value)
+  self._formatting=True
+  try:
+   self.vars[key].set(formatted)
+   # Formatting the prefix maps the cursor correctly even when whitespace shrinks.
+   widget.icursor(min(len(formatter(value[:cursor])),len(formatted)))
+  finally:self._formatting=False
  def _frequency_tooltip(self):
   frequency=self.vars["frequency_mhz"].get().strip()
   band=self.vars["band"].get().strip()
@@ -55,7 +70,7 @@ class QSOForm(ttk.LabelFrame):
  def new(self):
   self.qso_id=None
   for var in self.vars.values():var.set("")
-  self.vars["qso_start_utc"].set(datetime.now(timezone.utc).replace(microsecond=0).isoformat());self.vars["mode"].set("FM");self.vars["qsl_status"].set("NOT_SENT");self.notes.delete("1.0","end");self.callsign_widget.focus_set()
+  self.vars["qso_start_utc"].set(datetime.now(timezone.utc).replace(microsecond=0).isoformat());self.vars["mode"].set("FM");self.vars["qsl_status"].set("NOT_SENT");self.vars["power_w"].set("" if self.default_power_w is None else f"{self.default_power_w:g}");self.notes.delete("1.0","end");self.callsign_widget.focus_set()
  def load(self,q:QSO):
   self.qso_id=q.id
   for key in self.vars:
