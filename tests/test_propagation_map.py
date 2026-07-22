@@ -1,12 +1,14 @@
 """Headless tests for NOAA parsing/cache and locally generated map images."""
 import tempfile, unittest
+import unittest.mock as mock
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import Mock
 from propagation_models import PropagationMapRequest, SpaceWeatherData
 from services.propagation_cache import PropagationCache
 from services.propagation_map_service import PropagationMapService, evaluate_band_conditions
-from services.space_weather_service import SpaceWeatherError, SpaceWeatherService
+from services.space_weather_service import (InternetConnectionError, SpaceWeatherError,
+    SpaceWeatherService, check_internet_connection)
 
 class WeatherTests(unittest.TestCase):
  def test_noaa_values_are_parsed_from_mocked_json(self):
@@ -20,6 +22,10 @@ class WeatherTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    service=SpaceWeatherService(PropagationCache(Path(d)));service._get=Mock(side_effect=SpaceWeatherError("timeout"))
    with self.assertRaises(SpaceWeatherError):service.fetch()
+ def test_dns_failure_is_reported_without_http_retries(self):
+  import socket
+  with mock.patch("services.space_weather_service.socket.getaddrinfo",side_effect=socket.gaierror()):
+   with self.assertRaisesRegex(InternetConnectionError,"DNS"): check_internet_connection("https://services.swpc.noaa.gov/json/planetary_k_index_1m.json")
 
 class MapTests(unittest.TestCase):
  def setUp(self):self.weather=SpaceWeatherData(2,8,150,None,None,"fixture",datetime.now(timezone.utc),datetime.now(timezone.utc))
