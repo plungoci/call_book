@@ -6,7 +6,7 @@ Aplicație desktop locală/offline pentru evidența legăturilor radioamatorice 
 
 - Adăugare, editare, ștergere, listare și filtrare QSO (indicativ, bandă, mod, repetor și interval UTC), cu confirmare înaintea ștergerii.
 - Profil operator persistent în SQLite: date personale, echipament, antenă, putere implicită, club și observații.
-- Validare indicativ, frecvență, putere, locator Maidenhead și interval temporal; avertizare pentru duplicate în ±2 minute.
+- Validare indicativ, frecvență, putere, locator Maidenhead, date de propagare și interval temporal; avertizare pentru duplicate în ±2 minute.
 - Calcul configurabil al benzii, repetoare administrabile și păstrarea QSO-urilor la ștergerea unui repetor (`repeater_id` devine `NULL`).
 - Export Excel `.xlsx` cu antet, filtru, rând înghețat și dimensiuni ajustate; export ADIF cu lungimi calculate în octeți.
 - Backup SQLite online în `backups/`, configurare JSON locală și jurnal în `radio_logbook.log`.
@@ -73,6 +73,14 @@ Selectează un rând din tabel: devin disponibile **Editează** și **Șterge**.
 Pe măsură ce tastezi, câmpul **Indicativ** este convertit în majuscule (inclusiv cifrele și `/`), iar spațiile exterioare sunt eliminate. Câmpul **Nume** capitalizează fiecare cuvânt și reduce spațiile multiple; cursorul este păstrat în poziția corespunzătoare în timpul formatării. La salvare, aceleași reguli sunt aplicate din nou ca validare finală.
 
 Din **Fișier**, **Exportă Excel** creează implicit un fișier în `exports/`, **Exportă ADIF** creează `.adi` în același director, iar **Creează backup** folosește API-ul `sqlite3.backup()` și salvează în `backups/`.
+
+### Propagare
+
+Secțiunea **Propagare** a formularului este opțională și documentează traseul real al semnalului. Alege **Directă** pentru legături fără releu, **Repeater** pentru un repetor selectat deja în QSO, și **Satelit** pentru comunicații prin satelit. Lista include și modurile uzuale de propagare: **EME (Moonbounce)**, **Meteor Scatter**, **Troposcatter**, **Tropospheric Ducting**, **Sporadic-E**, **F2**, **Aurora/Aurora-E**, **NVIS**, **Backscatter**, **Aircraft/Rain Scatter** și **Ionoscatter**, precum și opțiuni pentru gateway-uri și moduri digitale. Selectează **Necunoscută** când traseul nu este cunoscut și **Altele** pentru un caz neacoperit de listă.
+
+Pentru **Satelit**, completează obligatoriu numele satelitului și modurile de lucru **uplink** și **downlink**; de exemplu, `QO-100`, `SSB`, `SSB`. Alegerea **QO-100** completează automat propagarea prin satelit și numele satelitului. **Distanță (km)** acceptă un număr pozitiv cu zecimale, iar **Azimut (°)** este opțional și trebuie să fie între 0 și 360. Observațiile de propagare pot păstra detalii precum QSB, aurora sau o deschidere Sporadic-E. Câmpurile sunt separate în modelul QSO pentru a permite ulterior calculul din locator, integrarea indicilor solari și a serviciilor de propagare.
+
+Exportul ADIF include `PROP_MODE` când există echivalent ADIF, `SAT_NAME`, `SAT_MODE` (uplink/downlink), `DISTANCE` și observațiile de propagare în `COMMENT`, păstrând și observațiile QSO existente. Azimutul și modurile fără echivalent ADIF rămân disponibile în Excel. Exportul Excel adaugă coloanele **Propagare**, **Satelit**, **Uplink**, **Downlink**, **Distanță**, **Azimut** și **Observații propagare**.
 
 ## Structură
 

@@ -11,6 +11,13 @@ class QSO:
     operator_name: str = ""; grid_square: str = ""; power_w: Optional[float] = None
     notes: str = ""; qsl_status: str = "NOT_SENT"; created_at: str = ""; updated_at: Optional[str] = None
     my_grid_square: str = ""
+    propagation_mode: str = "Necunoscută"
+    satellite_name: str = ""
+    uplink_mode: str = ""
+    downlink_mode: str = ""
+    distance_km: Optional[float] = None
+    azimuth_deg: Optional[float] = None
+    propagation_notes: str = ""
 
 @dataclass(slots=True)
 class Repeater:
