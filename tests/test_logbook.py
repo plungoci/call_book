@@ -10,6 +10,7 @@ from adif_export import adif_record
 from utils.maidenhead import coordinates_to_maidenhead, maidenhead_to_coordinates
 from services.location_service import LocationService, LocationUnavailableError, LocationTimeoutError
 from ui.main_window import MainWindow
+from ui.operator_profile_window import OperatorProfileWindow
 class LogbookTests(unittest.TestCase):
  def qso(self,**changes):
   values=dict(callsign="yo3abc/p",qso_start_utc="2026-01-01T12:00:00+00:00",qso_end_utc="2026-01-01T12:01:00+00:00",frequency_mhz=145.5,mode="FM")
@@ -60,6 +61,21 @@ class LogbookTests(unittest.TestCase):
    with self.assertRaises(LocationUnavailableError): LocationService().locate()
   with mock.patch("services.location_service.sys.platform","win32"),mock.patch("services.location_service.subprocess.run",side_effect=__import__('subprocess').TimeoutExpired("powershell",12)):
    with self.assertRaises(LocationTimeoutError): LocationService().locate()
+
+ def test_location_worker_preserves_deferred_callback_values(self):
+  class Window:
+   def __init__(self): self.callbacks=[]; self.error=None; self.location=None
+   def after(self,delay,callback): self.callbacks.append(callback)
+   def _location_error(self,error): self.error=error
+   def _apply_location(self,location): self.location=location
+  window=Window(); error=LocationUnavailableError("unavailable")
+  with mock.patch("ui.operator_profile_window.LocationService.locate",side_effect=error):
+   OperatorProfileWindow._detect_worker(window)
+  window.callbacks.pop()();self.assertIs(window.error,error)
+  location=mock.sentinel.location; window=Window()
+  with mock.patch("ui.operator_profile_window.LocationService.locate",return_value=location):
+   OperatorProfileWindow._detect_worker(window)
+  window.callbacks.pop()();self.assertIs(window.location,location)
 
 class MainWindowLogicTests(unittest.TestCase):
  def test_toggle_search_panel_preserves_filter_values(self):
