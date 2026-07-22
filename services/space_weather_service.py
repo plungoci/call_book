@@ -15,7 +15,6 @@ from .propagation_cache import PropagationCache
 NOAA_ENDPOINTS = {
  "kp":"https://services.swpc.noaa.gov/json/planetary_k_index_1m.json",
  "f107":"https://services.swpc.noaa.gov/json/f107_cm_flux.json",
- "predicted_f107":"https://services.swpc.noaa.gov/json/predicted_f107_cm_flux.json",
  "alerts":"https://services.swpc.noaa.gov/products/alerts.json",
 }
 class SpaceWeatherError(RuntimeError): pass
