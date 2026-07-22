@@ -9,7 +9,8 @@ from database import Database
 from adif_export import adif_record
 from excel_export import export_excel, HEADERS
 from utils.maidenhead import coordinates_to_maidenhead, maidenhead_to_coordinates
-from services.location_service import LocationService, LocationUnavailableError, LocationTimeoutError
+from services.location_service import (IpLocationService, LocationDnsError, LocationResponseError,
+ LocationResult, LocationService, LocationTimeoutError, LocationUnavailableError)
 from ui.main_window import MainWindow
 from ui.operator_profile_window import OperatorProfileWindow
 class LogbookTests(unittest.TestCase):
@@ -83,10 +84,27 @@ class LogbookTests(unittest.TestCase):
   with self.assertRaises(ValueError): maidenhead_to_coordinates("ZZ99zz")
  def test_location_service_unsupported_and_timeout(self):
   import unittest.mock as mock
+  fallback=mock.Mock(); expected=mock.sentinel.location; fallback.locate.return_value=expected
   with mock.patch("services.location_service.sys.platform","linux"):
-   with self.assertRaises(LocationUnavailableError): LocationService().locate()
+   self.assertIs(LocationService(fallback).locate(),expected)
   with mock.patch("services.location_service.sys.platform","win32"),mock.patch("services.location_service.subprocess.run",side_effect=__import__('subprocess').TimeoutExpired("powershell",12)):
-   with self.assertRaises(LocationTimeoutError): LocationService().locate()
+   self.assertIs(LocationService(fallback).locate(),expected)
+
+ def test_ip_location_parses_alternate_coordinate_names_and_validates_ranges(self):
+  service=IpLocationService("https://location.example/v1")
+  response=mock.MagicMock(); response.status=200; response.headers.get_content_type.return_value="application/json"; response.read.return_value=b'{"lat":"44.4268","lng":"26.1025"}'
+  response.__enter__.return_value=response
+  with mock.patch("services.location_service.socket.getaddrinfo",return_value=[(None,None,None,None,("127.0.0.1",443))]),mock.patch("services.location_service.socket.create_connection"),mock.patch("services.location_service.urlopen",return_value=response):
+   result=service.locate()
+  self.assertEqual((result.latitude,result.longitude),(44.4268,26.1025))
+  response.read.return_value=b'{"latitude":91,"longitude":0}'
+  with mock.patch("services.location_service.socket.getaddrinfo",return_value=[(None,None,None,None,("127.0.0.1",443))]),mock.patch("services.location_service.socket.create_connection"),mock.patch("services.location_service.urlopen",return_value=response):
+   with self.assertRaises(LocationResponseError): service.locate()
+
+ def test_ip_location_reports_dns_failure(self):
+  import socket
+  with mock.patch("services.location_service.socket.getaddrinfo",side_effect=socket.gaierror):
+   with self.assertRaises(LocationDnsError): IpLocationService().locate()
 
  def test_location_worker_preserves_deferred_callback_values(self):
   class Window:
