@@ -5,6 +5,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 try:
     from PySide6.QtWidgets import QApplication
@@ -33,6 +34,13 @@ class QSOFormTests(unittest.TestCase):
         self.assertEqual(len(FIELD_KEYS), len(set(FIELD_KEYS)))
         self.assertEqual(set(FIELD_KEYS), set(LABELS))
         validate_field_labels()
+
+    def test_form_starts_when_a_field_translation_is_missing(self):
+        """A translation mistake must not make the whole application unusable."""
+        with patch.dict(LABELS, {}, clear=True):
+            form = QSOForm(lambda: [])
+
+        self.assertIn("callsign", form.fields)
 
     def test_callsign_field_has_label_widget_and_helpful_tooltip(self):
         self.assertEqual(LABELS["callsign"], "Indicativ")
