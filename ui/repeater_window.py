@@ -2,11 +2,13 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from models import Repeater
+from .tooltip import Tooltip
 class RepeaterWindow(tk.Toplevel):
  def __init__(self,parent,db,on_change):
   super().__init__(parent);self.db=db;self.on_change=on_change;self.title("Administrare repetoare");self.vars={k:tk.StringVar() for k in ("name","output_frequency_mhz","input_frequency_mhz","shift_mhz","tone_hz","mode","location","grid_square")};self.selected=None
-  for i,(key,var) in enumerate(self.vars.items()):ttk.Label(self,text=key.replace("_"," ")).grid(row=i,column=0,sticky="w");ttk.Entry(self,textvariable=var).grid(row=i,column=1,sticky="ew")
-  self.notes=tk.Text(self,height=3);self.notes.grid(row=8,columnspan=2);ttk.Button(self,text="Salvează",command=self.save).grid(row=9,column=0);ttk.Button(self,text="Șterge",command=self.delete).grid(row=9,column=1);self.tree=ttk.Treeview(self,columns=("id","name","freq","location"),show="headings");[self.tree.heading(x,text=x) for x in ("id","name","freq","location")];self.tree.grid(row=0,column=2,rowspan=10);self.tree.bind("<<TreeviewSelect>>",self.select);self.refresh()
+  tips={"name":"Numele sau indicativul repetorului.","output_frequency_mhz":"Frecvența de emisie a repetorului, în MHz.","input_frequency_mhz":"Frecvența de intrare a repetorului, în MHz.","shift_mhz":"Diferența dintre frecvența de intrare și ieșire, în MHz.","tone_hz":"Tonul CTCSS, în Hz, dacă este necesar.","mode":"Modul de lucru al repetorului.","location":"Locația repetorului.","grid_square":"Locatorul Maidenhead al repetorului."}
+  for i,(key,var) in enumerate(self.vars.items()):ttk.Label(self,text=key.replace("_"," ")).grid(row=i,column=0,sticky="w");entry=ttk.Entry(self,textvariable=var);entry.grid(row=i,column=1,sticky="ew");Tooltip(entry,tips[key])
+  self.notes=tk.Text(self,height=3);self.notes.grid(row=8,columnspan=2);Tooltip(self.notes,"Observații suplimentare despre repetor.");save=ttk.Button(self,text="Salvează",command=self.save);save.grid(row=9,column=0);Tooltip(save,"Salvează repetorul în baza de date.");delete=ttk.Button(self,text="Șterge",command=self.delete);delete.grid(row=9,column=1);Tooltip(delete,"Șterge repetorul selectat după confirmare.");self.tree=ttk.Treeview(self,columns=("id","name","freq","location"),show="headings");[self.tree.heading(x,text=x) for x in ("id","name","freq","location")];self.tree.grid(row=0,column=2,rowspan=10);self.tree.bind("<<TreeviewSelect>>",self.select);Tooltip(self.tree,"Lista repetoarelor. Selectează un rând pentru editare.");self.refresh()
  def refresh(self):
   self.tree.delete(*self.tree.get_children())
   for r in self.db.list_repeaters():self.tree.insert("","end",iid=r["id"],values=(r["id"],r["name"],r["output_frequency_mhz"],r["location"]))
