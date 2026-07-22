@@ -17,7 +17,6 @@ NOAA_ENDPOINTS = {
  "f107":"https://services.swpc.noaa.gov/json/f107_cm_flux.json",
  "predicted_f107":"https://services.swpc.noaa.gov/json/predicted_f107_cm_flux.json",
  "alerts":"https://services.swpc.noaa.gov/products/alerts.json",
- "a_index":"https://services.swpc.noaa.gov/json/wing_kp_1m.json",
 }
 class SpaceWeatherError(RuntimeError): pass
 class InternetConnectionError(SpaceWeatherError): pass
@@ -102,8 +101,8 @@ class SpaceWeatherService:
    LOG.debug("Propagare: se folosesc date NOAA valide din cache.")
    return self._from_dict(cached)
   self._internet_checked=False
-  kp=self._get(NOAA_ENDPOINTS["kp"]); flux=self._get(NOAA_ENDPOINTS["f107"]); ai=self._get(NOAA_ENDPOINTS["a_index"]); alerts=self._get(NOAA_ENDPOINTS["alerts"])
-  now=datetime.now(timezone.utc); data={"kp_index":_latest(kp,("kp_index","kp")),"solar_flux":_latest(flux,("flux","f107","f10.7")),"a_index":_latest(ai,("a_index","a")),"sunspot_number":_latest(flux,("sunspot_number","sunspot")),"radio_blackout_level":_blackout(alerts),"source":"NOAA SWPC JSON","observed_at_utc":now.isoformat(),"fetched_at_utc":now.isoformat()}
+  kp=self._get(NOAA_ENDPOINTS["kp"]); flux=self._get(NOAA_ENDPOINTS["f107"]); alerts=self._get(NOAA_ENDPOINTS["alerts"])
+  now=datetime.now(timezone.utc); data={"kp_index":_latest(kp,("kp_index","kp")),"solar_flux":_latest(flux,("flux","f107","f10.7")),"a_index":_latest(kp,("a_running","a_index","a")),"sunspot_number":_latest(flux,("sunspot_number","sunspot")),"radio_blackout_level":_blackout(alerts),"source":"NOAA SWPC JSON","observed_at_utc":now.isoformat(),"fetched_at_utc":now.isoformat()}
   self.cache.write_json(self.cache.weather_path(),data)
   LOG.info("Propagare: datele NOAA au fost actualizate cu succes.")
   return self._from_dict(data)
