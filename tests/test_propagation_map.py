@@ -7,17 +7,23 @@ from unittest.mock import Mock
 from propagation_models import PropagationMapRequest, SpaceWeatherData
 from services.propagation_cache import PropagationCache
 from services.propagation_map_service import PropagationMapService, evaluate_band_conditions
-from services.space_weather_service import (InternetConnectionError, SpaceWeatherError,
-    SpaceWeatherService, check_internet_connection)
+from services.space_weather_service import (InternetConnectionError, NOAA_ENDPOINTS,
+    SpaceWeatherError, SpaceWeatherService, check_internet_connection)
 
 class WeatherTests(unittest.TestCase):
  def test_noaa_values_are_parsed_from_mocked_json(self):
   with tempfile.TemporaryDirectory() as d:
    service=SpaceWeatherService(PropagationCache(Path(d)))
-   payloads=[ [{"kp_index":"3.3"}], [{"flux":"155","sunspot_number":"88"}], [{"a_index":"12"}], [{"message":"R2 RADIO BLACKOUT"}] ]
+   payloads=[ [{"kp_index":"3.3","a_running":"12"}], [{"flux":"155","sunspot_number":"88"}], [{"message":"R2 RADIO BLACKOUT"}] ]
    service._get=Mock(side_effect=payloads)
    value=service.fetch()
    self.assertEqual((value.kp_index,value.solar_flux,value.a_index,value.sunspot_number,value.radio_blackout_level),(3.3,155.,12.,88.,"R2"))
+   self.assertEqual(service._get.call_args_list, [
+    mock.call(NOAA_ENDPOINTS["kp"]), mock.call(NOAA_ENDPOINTS["f107"]), mock.call(NOAA_ENDPOINTS["alerts"]),
+   ])
+ def test_a_index_uses_the_planetary_k_index_response(self):
+  self.assertNotIn("a_index", NOAA_ENDPOINTS)
+  self.assertNotIn("wing_kp_1m.json", NOAA_ENDPOINTS.values())
  def test_failure_does_not_create_fake_values(self):
   with tempfile.TemporaryDirectory() as d:
    service=SpaceWeatherService(PropagationCache(Path(d)));service._get=Mock(side_effect=SpaceWeatherError("timeout"))
