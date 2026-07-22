@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from tkinter import ttk
 from models import QSO
 from validators import band_for_frequency, format_name_input, normalize_callsign
+from services.band_detector import BandDetector
 from services.propagation_service import PROPAGATION_UNKNOWN
 from .tooltip import Tooltip
 MODES=("FM","AM","SSB","USB","LSB","CW","RTTY","FT8","FT4","PSK31","DIGITAL","MSK144","EchoLink","AllStar","DMR","D-STAR","C4FM","Internet Gateway"); QSL=("NOT_SENT","SENT","RECEIVED","CONFIRMED")
@@ -27,6 +28,7 @@ class QSOForm(ttk.LabelFrame):
    "qso_end_utc":"Data și ora de sfârșit a QSO-ului, în UTC.",
   }
   labels=[("Indicativ","callsign"),("Nume","operator_name"),("Repetor","repeater"),("Frecvență MHz","frequency_mhz"),("Bandă","band"),("Mod","mode"),("RST trimis","rst_sent"),("RST primit","rst_received"),("Locator","grid_square"),("Putere W","power_w"),("QSL","qsl_status"),("Început UTC","qso_start_utc"),("Sfârșit UTC","qso_end_utc")]
+  self.frequency_notice=tk.StringVar(value="")
   for i,(label,key) in enumerate(labels):
    ttk.Label(self,text=label).grid(row=i//2*2,column=i%2*2,sticky="w",padx=3)
    widget=ttk.Combobox(self,textvariable=self.vars[key],state="readonly" if key in ("repeater","mode","qsl_status") else "normal",width=28) if key in ("repeater","mode","qsl_status") else ttk.Entry(self,textvariable=self.vars[key],width=30)
@@ -34,6 +36,7 @@ class QSOForm(ttk.LabelFrame):
    elif key=="qsl_status":widget["values"]=QSL
    elif key=="repeater":widget["values"]=["" ]+[f"{r['id']} — {r['name']}" for r in self.repeaters()];widget.bind("<<ComboboxSelected>>",self._repeater)
    widget.grid(row=i//2*2+1,column=i%2*2,sticky="ew",padx=3);setattr(self,key+"_widget",widget);Tooltip(widget,descriptions[key])
+   if key=="frequency_mhz": ttk.Label(self,textvariable=self.frequency_notice,foreground="#a16207").grid(row=i//2*2+2,column=i%2*2,sticky="w",padx=3)
   ttk.Label(self,text="Observații").grid(row=14,column=0,sticky="w");self.notes=tk.Text(self,width=65,height=3);self.notes.grid(row=15,column=0,columnspan=4,sticky="ew",padx=3);Tooltip(self.notes,"Informații suplimentare despre QSO.")
  def _bind_formatters(self):
   """Format callsign and name immediately, retaining the insertion point."""
@@ -73,13 +76,22 @@ class QSOForm(ttk.LabelFrame):
  def _frequency_changed(self):
   """Detect the existing band from a valid frequency."""
   if self._suppress_context_updates or self._updating_band:return
-  try: band=band_for_frequency(float(self.vars["frequency_mhz"].get()))
-  except ValueError: return
-  if band != "Unknown":
+  try: band=BandDetector.frequency_to_band(float(self.vars["frequency_mhz"].get()))
+  except ValueError:
+   self.frequency_notice.set("")
+   return
+  if band:
    self._updating_band=True
-   try:self.vars["band"].set(band)
+   try:
+    if self.vars["band"].get()!=band:self.vars["band"].set(band)
    finally:self._updating_band=False
+   self.frequency_notice.set("")
+   # A frequency change within the same band still needs an immediate panel refresh.
+   if self.band_callback:self.band_callback(band, self.vars["frequency_mhz"].get())
+  else:
+   self.frequency_notice.set("Frecvența nu aparține unei benzi cunoscute; banda curentă este păstrată.")
  def _band_changed(self):
+  if self._updating_band:return
   if self.band_callback:self.band_callback(self.vars["band"].get(), self.vars["frequency_mhz"].get())
  def new(self):
   self.qso_id=None;self._suppress_context_updates=True

@@ -42,9 +42,9 @@ class PropagationPanel(ttk.LabelFrame):
 
         weather_frame = ttk.LabelFrame(self, text="Space Weather", padding=6)
         weather_frame.pack(fill="x", pady=(8, 4))
-        self.updated = tk.StringVar(value="N/A")
+        self.updated = tk.StringVar(value="—")
         self.source = tk.StringVar(value="NOAA SWPC")
-        self._metric_values = {name: tk.StringVar(value="N/A") for name in (
+        self._metric_values = {name: tk.StringVar(value="—") for name in (
             "SFI", "SSN", "K Index", "A Index", "X-Ray Flux", "Proton Flux",
             "Electron Flux", "Auroral Activity", "Bz", "Solar Wind", "Densitate particule",
         )}
@@ -70,7 +70,7 @@ class PropagationPanel(ttk.LabelFrame):
         self._condition_labels: dict[str, tuple[tk.Label, tk.Label]] = {}
         for row, band in enumerate(("80m", "40m", "20m", "15m", "10m"), start=1):
             ttk.Label(self.conditions, text=band).grid(row=row, column=0, sticky="w", padx=(0, 22))
-            day, night = tk.StringVar(value="N/A"), tk.StringVar(value="N/A")
+            day, night = tk.StringVar(value="—"), tk.StringVar(value="—")
             day_label = tk.Label(self.conditions, textvariable=day, anchor="w")
             night_label = tk.Label(self.conditions, textvariable=night, anchor="w")
             day_label.grid(row=row, column=1, sticky="w", padx=(0, 22))
@@ -80,7 +80,7 @@ class PropagationPanel(ttk.LabelFrame):
 
         geomagnetic = ttk.LabelFrame(self, text="Geomagnetic", padding=6)
         geomagnetic.pack(fill="x", pady=(4, 0))
-        self._geomagnetic = tk.StringVar(value="Aurora: N/A    Bz: N/A    Solar Wind: N/A")
+        self._geomagnetic = tk.StringVar(value="Aurora: —    Bz: —    Solar Wind: —")
         ttk.Label(geomagnetic, textvariable=self._geomagnetic).pack(anchor="w")
 
     @staticmethod
@@ -139,17 +139,21 @@ class PropagationPanel(ttk.LabelFrame):
             "SSN": weather.sunspot_number,
             "K Index": weather.kp_index,
             "A Index": weather.a_index,
-            "X-Ray Flux": None,
-            "Proton Flux": None,
-            "Electron Flux": None,
-            "Auroral Activity": None,
-            "Bz": None,
-            "Solar Wind": None,
-            "Densitate particule": None,
+            "X-Ray Flux": weather.xray_flux,
+            "Proton Flux": weather.proton_flux,
+            "Electron Flux": weather.electron_flux,
+            "Auroral Activity": weather.auroral_activity,
+            "Bz": weather.bz,
+            "Solar Wind": weather.solar_wind_speed,
+            "Densitate particule": weather.solar_wind_density,
         }
         for name, value in values.items():
             self._metric_values[name].set(self._format_value(value))
-        self._geomagnetic.set("Aurora: N/A    Bz: N/A    Solar Wind: N/A")
+        self._geomagnetic.set(
+            f"Aurora: {self._format_value(weather.auroral_activity)}%    "
+            f"Bz: {self._format_value(weather.bz)} nT    "
+            f"Solar Wind: {self._format_value(weather.solar_wind_speed)} km/s"
+        )
         for band, (day, night) in self._estimator.calculate_hf(weather, datetime.now(timezone.utc)).items():
             day_value, night_value = self._condition_values[band]
             day_label, night_label = self._condition_labels[band]
@@ -161,7 +165,7 @@ class PropagationPanel(ttk.LabelFrame):
     @staticmethod
     def _format_value(value: float | str | None) -> str:
         if value is None:
-            return "N/A"
+            return "Unavailable"
         return f"{value:g}" if isinstance(value, float) else str(value)
 
     def shutdown(self) -> None:
