@@ -16,7 +16,6 @@ from .operator_profile_window import OperatorProfileWindow
 from .propagation_panel import PropagationPanel
 from .qso_form import QSOForm
 from .repeater_window import RepeaterWindow
-from .theme import COLORS, apply_dark_theme
 from .tooltip import Tooltip
 
 
@@ -36,7 +35,6 @@ class MainWindow(tk.Tk):
         self.title("Radio Logbook")
         self.geometry("1440x900")
         self.minsize(1024, 700)
-        apply_dark_theme(self)
         self.create_menu_bar()
         self._build_shell()
         self._schedule_propagation_auto_refresh()
@@ -49,14 +47,14 @@ class MainWindow(tk.Tk):
         self.refresh()
 
     def _build_shell(self) -> None:
-        toolbar = ttk.Frame(self, style="Surface.TFrame", padding=(16, 10))
+        toolbar = ttk.Frame(self, padding=(16, 10))
         toolbar.pack(fill="x")
-        ttk.Label(toolbar, text="Radio Logbook", style="Title.TLabel").pack(side="left")
-        ttk.Label(toolbar, text="Jurnal radioamator • operare locală", style="Muted.TLabel").pack(side="left", padx=(12, 0))
+        ttk.Label(toolbar, text="Radio Logbook").pack(side="left")
+        ttk.Label(toolbar, text="Jurnal radioamator • operare locală").pack(side="left", padx=(12, 0))
         ttk.Button(toolbar, text="⌕  Caută", command=self.toggle_search_panel).pack(side="right", padx=(6, 0))
-        self.quick_save = ttk.Button(toolbar, text="Salvează QSO", style="Accent.TButton", command=self.save)
+        self.quick_save = ttk.Button(toolbar, text="Salvează QSO", command=self.save)
         self.quick_save.pack(side="right")
-        self.clock = ttk.Label(toolbar, style="Muted.TLabel")
+        self.clock = ttk.Label(toolbar)
         self.clock.pack(side="right", padx=18)
         self._clock()
 
@@ -81,63 +79,63 @@ class MainWindow(tk.Tk):
         self.form = QSOForm(self.log_tab, self.db.list_repeaters, self.save, self.operator_profile.default_power_w, self.propagation_context_changed)
         self.form.pack(fill="x", pady=(0, 10))
         self._actions()
-        table_card = ttk.Frame(self.log_tab, style="Card.TFrame", padding=10)
+        table_card = ttk.Frame(self.log_tab, padding=10)
         table_card.pack(fill="both", expand=True, pady=(10, 0))
-        header = ttk.Frame(table_card, style="Surface.TFrame")
+        header = ttk.Frame(table_card)
         header.pack(fill="x", pady=(0, 7))
-        ttk.Label(header, text="Jurnal QSO", style="Section.TLabel").pack(side="left")
-        ttk.Label(header, text="Selectează un rând pentru editare sau ștergere.", style="CardMuted.TLabel").pack(side="left", padx=10)
+        ttk.Label(header, text="Jurnal QSO").pack(side="left")
+        ttk.Label(header, text="Selectează un rând pentru editare sau ștergere.").pack(side="left", padx=10)
         self._table(table_card)
 
     def _build_propagation_tab(self) -> None:
-        intro = ttk.Frame(self.propagation_tab, style="Card.TFrame", padding=12)
+        intro = ttk.Frame(self.propagation_tab, padding=12)
         intro.pack(fill="x", pady=(0, 10))
-        ttk.Label(intro, text="Condiții de propagare", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(intro, text="Estimări locale bazate pe date space weather; nu reprezintă predicții garantate.", style="CardMuted.TLabel").pack(anchor="w", pady=(3, 0))
+        ttk.Label(intro, text="Condiții de propagare").pack(anchor="w")
+        ttk.Label(intro, text="Estimări locale bazate pe date space weather; nu reprezintă predicții garantate.").pack(anchor="w", pady=(3, 0))
         self.propagation_panel = PropagationPanel(self.propagation_tab)
         self.propagation_panel.pack(fill="both", expand=True)
         if self.app_config.get("show_propagation_panel", "true").lower() != "true":
             self.notebook.hide(self.propagation_tab)
 
     def _build_location_tab(self) -> None:
-        card = ttk.Frame(self.location_tab, style="Card.TFrame", padding=20)
+        card = ttk.Frame(self.location_tab, padding=20)
         card.pack(fill="x", anchor="n")
-        ttk.Label(card, text="🌍  Poziția stației", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(card, text="Locatorul Maidenhead și datele stației sunt păstrate local în profilul operatorului.", style="CardMuted.TLabel").pack(anchor="w", pady=(4, 16))
+        ttk.Label(card, text="🌍  Poziția stației").pack(anchor="w")
+        ttk.Label(card, text="Locatorul Maidenhead și datele stației sunt păstrate local în profilul operatorului.").pack(anchor="w", pady=(4, 16))
         profile = self.operator_profile
         details = (("Locator Maidenhead", profile.grid_square or profile.maidenhead_locator or "Nesetat"), ("Latitudine", "—" if profile.latitude is None else f"{profile.latitude:.6f}°"), ("Longitudine", "—" if profile.longitude is None else f"{profile.longitude:.6f}°"), ("Sursă", profile.location_source or "Nesetată"))
-        grid = ttk.Frame(card, style="Surface.TFrame")
+        grid = ttk.Frame(card)
         grid.pack(fill="x")
         for index, (label, value) in enumerate(details):
-            item = ttk.Frame(grid, style="Card.TFrame", padding=12)
+            item = ttk.Frame(grid, padding=12)
             item.grid(row=0, column=index, sticky="nsew", padx=(0, 8) if index < 3 else 0)
-            ttk.Label(item, text=label, style="CardMuted.TLabel").pack(anchor="w")
-            ttk.Label(item, text=value, style="Metric.TLabel").pack(anchor="w", pady=(3, 0))
+            ttk.Label(item, text=label).pack(anchor="w")
+            ttk.Label(item, text=value).pack(anchor="w", pady=(3, 0))
             grid.columnconfigure(index, weight=1)
-        ttk.Button(card, text="Deschide profilul operatorului", style="Accent.TButton", command=self.open_operator_profile).pack(anchor="w", pady=(18, 0))
+        ttk.Button(card, text="Deschide profilul operatorului", command=self.open_operator_profile).pack(anchor="w", pady=(18, 0))
 
     def _build_settings_tab(self) -> None:
-        ttk.Label(self.settings_tab, text="Setări și administrare", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(self.settings_tab, text="Acțiunile sunt grupate pe domenii, fără a aglomera zona de operare.", style="Muted.TLabel").pack(anchor="w", pady=(3, 14))
+        ttk.Label(self.settings_tab, text="Setări și administrare").pack(anchor="w")
+        ttk.Label(self.settings_tab, text="Acțiunile sunt grupate pe domenii, fără a aglomera zona de operare.").pack(anchor="w", pady=(3, 14))
         grid = ttk.Frame(self.settings_tab)
         grid.pack(fill="x", anchor="n")
         cards = (("General", "Profil, indicativ și echipament", "Date operator", self.open_operator_profile), ("Repetoare", "Frecvențe, shift, CTCSS și locator", "Administrează repetoare", self.open_repeaters), ("Propagare", "Surse și interval de actualizare", "Setări propagare", self.open_propagation_settings), ("Date", "Exportă jurnalul sau creează o copie", "Creează backup", self.backup))
         for index, (title, description, action, command) in enumerate(cards):
-            card = ttk.Frame(grid, style="Card.TFrame", padding=16)
+            card = ttk.Frame(grid, padding=16)
             card.grid(row=index // 2, column=index % 2, sticky="nsew", padx=(0, 10) if index % 2 == 0 else 0, pady=(0, 10))
-            ttk.Label(card, text=title, style="Section.TLabel").pack(anchor="w")
-            ttk.Label(card, text=description, style="CardMuted.TLabel", wraplength=340).pack(anchor="w", pady=(5, 16))
+            ttk.Label(card, text=title).pack(anchor="w")
+            ttk.Label(card, text=description, wraplength=340).pack(anchor="w", pady=(5, 16))
             ttk.Button(card, text=action, command=command).pack(anchor="w")
         grid.columnconfigure(0, weight=1); grid.columnconfigure(1, weight=1)
 
     def _build_status_bar(self) -> None:
-        status = ttk.Frame(self, style="Surface.TFrame", padding=(14, 6))
+        status = ttk.Frame(self, padding=(14, 6))
         status.pack(fill="x", side="bottom")
         self.status_message = tk.StringVar(value="Gata pentru un QSO nou.")
-        ttk.Label(status, textvariable=self.status_message, style="Muted.TLabel").pack(side="left")
-        ttk.Label(status, text="● Local", foreground=COLORS["success"], style="Muted.TLabel").pack(side="right")
-        ttk.Label(status, text="NOAA la cerere", style="Muted.TLabel").pack(side="right", padx=16)
-        ttk.Label(status, text="Radio Logbook", style="Muted.TLabel").pack(side="right")
+        ttk.Label(status, textvariable=self.status_message).pack(side="left")
+        ttk.Label(status, text="● Local").pack(side="right")
+        ttk.Label(status, text="NOAA la cerere").pack(side="right", padx=16)
+        ttk.Label(status, text="Radio Logbook").pack(side="right")
 
     def create_menu_bar(self) -> None:
         menu = tk.Menu(self); file_menu = tk.Menu(menu, tearoff=False)
@@ -148,18 +146,18 @@ class MainWindow(tk.Tk):
         self.config(menu=menu)
 
     def open_propagation_settings(self) -> None:
-        window = tk.Toplevel(self); window.title("Setări condiții propagare"); window.transient(self); window.configure(background=COLORS["background"])
+        window = tk.Toplevel(self); window.title("Setări condiții propagare"); window.transient(self)
         enabled = tk.BooleanVar(value=self.app_config.get("propagation_auto_refresh_minutes", "15") in PROPAGATION_REFRESH_INTERVALS); interval = tk.StringVar(value=self.app_config.get("propagation_auto_refresh_minutes", "15"))
-        card = ttk.Frame(window, style="Card.TFrame", padding=16); card.pack(fill="both", expand=True, padx=12, pady=12)
-        ttk.Label(card, text="Actualizare propagare", style="Section.TLabel").pack(anchor="w"); ttk.Label(card, text="Datele sunt descărcate din surse instituționale și oferă o estimare orientativă.", style="CardMuted.TLabel", wraplength=480).pack(anchor="w", pady=(5, 12)); ttk.Checkbutton(card, text="Actualizare automată condiții", variable=enabled).pack(anchor="w")
-        row = ttk.Frame(card, style="Surface.TFrame"); row.pack(fill="x", pady=10); ttk.Label(row, text="Interval:", style="Card.TLabel").pack(side="left"); ttk.Combobox(row, textvariable=interval, values=("10", "15", "30", "60"), state="readonly", width=8).pack(side="left", padx=6); ttk.Label(row, text="minute", style="Card.TLabel").pack(side="left")
+        card = ttk.Frame(window, padding=16); card.pack(fill="both", expand=True, padx=12, pady=12)
+        ttk.Label(card, text="Actualizare propagare").pack(anchor="w"); ttk.Label(card, text="Datele sunt descărcate din surse instituționale și oferă o estimare orientativă.", wraplength=480).pack(anchor="w", pady=(5, 12)); ttk.Checkbutton(card, text="Actualizare automată condiții", variable=enabled).pack(anchor="w")
+        row = ttk.Frame(card); row.pack(fill="x", pady=10); ttk.Label(row, text="Interval:").pack(side="left"); ttk.Combobox(row, textvariable=interval, values=("10", "15", "30", "60"), state="readonly", width=8).pack(side="left", padx=6); ttk.Label(row, text="minute").pack(side="left")
         def save_settings() -> None:
             self.app_config["propagation_auto_refresh_minutes"] = interval.get() if enabled.get() else "0"; save_config(self.app_config)
             if self._propagation_auto_after_id:
                 try: self.after_cancel(self._propagation_auto_after_id)
                 except tk.TclError: pass
             self._schedule_propagation_auto_refresh(); self._set_status("Setările de propagare au fost actualizate."); window.destroy()
-        ttk.Button(card, text="Salvează", style="Accent.TButton", command=save_settings).pack(anchor="e")
+        ttk.Button(card, text="Salvează", command=save_settings).pack(anchor="e")
 
     def propagation_context_changed(self, band: str, frequency: str) -> None:
         try: value = float(frequency) if frequency.strip() else None
@@ -181,15 +179,15 @@ class MainWindow(tk.Tk):
         now, utc = datetime.now().astimezone(), datetime.now(timezone.utc); self.clock.config(text=f"Local {now:%H:%M:%S}  |  UTC {utc:%H:%M:%S}"); self._clock_after_id = self.after(1000, self._clock)
 
     def _filters(self) -> None:
-        self.search_panel = ttk.Frame(self.log_tab, style="Card.TFrame", padding=10); self.search, self.band, self.mode = tk.StringVar(), tk.StringVar(), tk.StringVar(); self.rep, self.date_from, self.date_to = tk.StringVar(), tk.StringVar(), tk.StringVar()
+        self.search_panel = ttk.Frame(self.log_tab, padding=10); self.search, self.band, self.mode = tk.StringVar(), tk.StringVar(), tk.StringVar(); self.rep, self.date_from, self.date_to = tk.StringVar(), tk.StringVar(), tk.StringVar()
         fields = (("Indicativ", self.search), ("Bandă", self.band), ("Mod", self.mode), ("Repetor ID", self.rep), ("De la", self.date_from), ("Până la", self.date_to))
         for label, variable in fields:
-            group = ttk.Frame(self.search_panel, style="Surface.TFrame"); group.pack(side="left", fill="x", expand=True, padx=3); ttk.Label(group, text=label, style="CardMuted.TLabel").pack(anchor="w"); entry = ttk.Entry(group, textvariable=variable); entry.pack(fill="x"); Tooltip(entry, f"Filtrează QSO-urile după {label.lower()}.")
+            group = ttk.Frame(self.search_panel); group.pack(side="left", fill="x", expand=True, padx=3); ttk.Label(group, text=label).pack(anchor="w"); entry = ttk.Entry(group, textvariable=variable); entry.pack(fill="x"); Tooltip(entry, f"Filtrează QSO-urile după {label.lower()}.")
             if variable is self.search: self.search_entry = entry
         ttk.Button(self.search_panel, text="Aplică", command=self.refresh).pack(side="left", padx=(8, 3)); ttk.Button(self.search_panel, text="Resetează", command=self.reset).pack(side="left")
     def _actions(self) -> None:
         actions = ttk.Frame(self.log_tab); actions.pack(fill="x")
-        self.save_button = ttk.Button(actions, text="Salvează QSO", style="Accent.TButton", command=self.save); self.save_button.pack(side="left"); Tooltip(self.save_button, "Salvează QSO-ul în baza de date.")
+        self.save_button = ttk.Button(actions, text="Salvează QSO", command=self.save); self.save_button.pack(side="left"); Tooltip(self.save_button, "Salvează QSO-ul în baza de date.")
         for name, command, attr, state in (("QSO nou", self.cancel_edit, None, "normal"), ("Anulează editarea", self.cancel_edit, "cancel_button", "disabled"), ("Editează", self.edit, "edit_button", "disabled"), ("Șterge", self.delete, "delete_button", "disabled")):
             button = ttk.Button(actions, text=name, command=command, state=state); button.pack(side="left", padx=(6, 0));
             if attr: setattr(self, attr, button)
