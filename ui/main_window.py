@@ -17,6 +17,7 @@ from .operator_profile_window import OperatorProfileWindow
 from .qso_form import QSOForm
 from .repeater_window import RepeaterWindow
 from .tooltip import Tooltip
+from .propagation_map_panel import PropagationMapPanel
 
 
 class MainWindow(tk.Tk):
@@ -30,6 +31,7 @@ class MainWindow(tk.Tk):
         self.operator_profile_window: OperatorProfileWindow | None = None
         self.repeater_window: RepeaterWindow | None = None
         self._clock_after_id: str | None = None
+        self._propagation_auto_after_id: str | None = None
         self.title("Radio Logbook")
         self.geometry("1250x760")
         self.create_menu_bar()
@@ -37,8 +39,12 @@ class MainWindow(tk.Tk):
         self.clock.pack(anchor="e", padx=8)
         self._clock()
         self._filters()
-        self.form = QSOForm(self, self.db.list_repeaters, self.save, self.operator_profile.default_power_w)
+        self.form = QSOForm(self, self.db.list_repeaters, self.save, self.operator_profile.default_power_w, self.propagation_context_changed)
         self.form.pack(fill="x", padx=8)
+        self.propagation_panel = PropagationMapPanel(self, self.db.get_operator_profile, self.expand_propagation_map)
+        self.propagation_panel.pack(fill="both", expand=False, padx=8, pady=(4,0))
+        if self.app_config.get("show_propagation_map", "true").lower() != "true": self.propagation_panel.pack_forget()
+        self._schedule_propagation_auto_refresh()
         self._actions()
         self._table()
         self.protocol("WM_DELETE_WINDOW", self.close_application)
@@ -63,8 +69,63 @@ class MainWindow(tk.Tk):
         settings = tk.Menu(menu, tearoff=False)
         settings.add_command(label="Date operator", command=self.open_operator_profile)
         settings.add_command(label="Repetoare", command=self.open_repeaters)
+        settings.add_command(label="Setări hartă propagare", command=self.open_propagation_settings)
         menu.add_cascade(label="Setări", menu=settings)
+        # Keep menu construction usable by the headless logic tests as well.
+        if "app_config" in self.__dict__:
+            view = tk.Menu(menu, tearoff=False)
+            self.show_propagation_map_var = tk.BooleanVar(value=self.app_config.get("show_propagation_map", "true").lower() == "true")
+            view.add_checkbutton(label="Hartă propagare", variable=self.show_propagation_map_var, command=self.toggle_propagation_map)
+            view.add_command(label="Actualizează harta propagării", command=self.refresh_propagation_map)
+            menu.add_cascade(label="Vizualizare", menu=view)
         self.config(menu=menu)
+
+    def open_propagation_settings(self) -> None:
+        window = tk.Toplevel(self); window.title("Setări hartă propagare"); window.transient(self)
+        enabled = tk.BooleanVar(value=self.app_config.get("propagation_auto_refresh_minutes", "15") in {"10", "15", "30", "60"})
+        interval = tk.StringVar(value=self.app_config.get("propagation_auto_refresh_minutes", "15"))
+        ttk.Label(window, text="Datele meteo spațiale sunt descărcate de pe internet. Harta este generată local, folosind locația configurată a operatorului.", wraplength=480, justify="left").pack(padx=12, pady=(12,6))
+        ttk.Checkbutton(window, text="Actualizare automată hartă", variable=enabled).pack(anchor="w", padx=12)
+        row=ttk.Frame(window);row.pack(fill="x",padx=12,pady=6);ttk.Label(row,text="Interval:").pack(side="left");ttk.Combobox(row,textvariable=interval,values=("10","15","30","60"),state="readonly",width=8).pack(side="left");ttk.Label(row,text="minute").pack(side="left")
+        def save_settings() -> None:
+            self.app_config["propagation_auto_refresh_minutes"] = interval.get() if enabled.get() else "0"
+            if self._propagation_auto_after_id:
+                try: self.after_cancel(self._propagation_auto_after_id)
+                except tk.TclError: pass
+            self._schedule_propagation_auto_refresh(); window.destroy()
+        ttk.Button(window,text="Salvează",command=save_settings).pack(pady=(0,12))
+
+    def propagation_context_changed(self, band: str, frequency: str) -> None:
+        """Debounce band/frequency changes; QSO typing never starts HTTP directly."""
+        try: value = float(frequency) if frequency.strip() else None
+        except ValueError: value = None
+        if "propagation_panel" in self.__dict__ and self.show_propagation_map_var.get(): self.propagation_panel.schedule(band, value)
+
+    def refresh_propagation_map(self) -> None:
+        self.propagation_context_changed(self.form.vars["band"].get(), self.form.vars["frequency_mhz"].get())
+
+    def toggle_propagation_map(self) -> None:
+        visible = self.show_propagation_map_var.get()
+        self.app_config["show_propagation_map"] = "true" if visible else "false"
+        if visible:
+            if "tree" in self.__dict__: self.propagation_panel.pack(fill="both", expand=False, padx=8, pady=(4,0), before=self.tree)
+            else: self.propagation_panel.pack(fill="both", expand=False, padx=8, pady=(4,0))
+            self.refresh_propagation_map()
+        else: self.propagation_panel.pack_forget()
+
+    def expand_propagation_map(self) -> None:
+        if not self.propagation_panel.propagation_photo: return
+        window=tk.Toplevel(self); window.title("Hartă propagare — Estimare"); label=ttk.Label(window, image=self.propagation_panel.propagation_photo); label.image=self.propagation_panel.propagation_photo; label.pack(padx=8,pady=8)
+
+    def _schedule_propagation_auto_refresh(self) -> None:
+        try: minutes=int(self.app_config.get("propagation_auto_refresh_minutes", "15"))
+        except ValueError: minutes=15
+        if minutes not in (10,15,30,60): return
+        self._propagation_auto_after_id=self.after(minutes*60*1000, self._automatic_propagation_refresh)
+
+    def _automatic_propagation_refresh(self) -> None:
+        if self.show_propagation_map_var.get() and self.form.vars["band"].get(): self.refresh_propagation_map()
+        self._schedule_propagation_auto_refresh()
 
     def _clock(self) -> None:
         now, utc = datetime.now().astimezone(), datetime.now(timezone.utc)
@@ -264,6 +325,11 @@ class MainWindow(tk.Tk):
 
     def close_application(self) -> None:
         """Stop scheduled UI work and close child dialogs before destroying Tk."""
+        self.propagation_panel.shutdown()
+        if self._propagation_auto_after_id is not None:
+            try: self.after_cancel(self._propagation_auto_after_id)
+            except tk.TclError: pass
+            self._propagation_auto_after_id = None
         if self._clock_after_id is not None:
             try:
                 self.after_cancel(self._clock_after_id)

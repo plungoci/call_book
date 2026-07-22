@@ -10,8 +10,8 @@ from services.propagation_service import (PROPAGATION_SATELLITE, PROPAGATION_UNK
 from .tooltip import Tooltip
 MODES=("FM","AM","SSB","USB","LSB","CW","RTTY","FT8","FT4","PSK31","DIGITAL","MSK144","EchoLink","AllStar","DMR","D-STAR","C4FM","Internet Gateway"); QSL=("NOT_SENT","SENT","RECEIVED","CONFIRMED")
 class QSOForm(ttk.LabelFrame):
- def __init__(self,parent,repeaters,on_save,default_power_w=None):
-  super().__init__(parent,text="QSO (toate orele sunt UTC)",padding=8);self.repeaters=repeaters;self.on_save=on_save;self.default_power_w=default_power_w;self.qso_id=None;self.vars={k:tk.StringVar() for k in ("callsign","operator_name","repeater","frequency_mhz","band","mode","rst_sent","rst_received","grid_square","power_w","qsl_status","qso_start_utc","qso_end_utc","propagation_mode","satellite_name","uplink_mode","downlink_mode","distance_km","azimuth_deg")};self._formatting=False;self._updating_propagation=False;self._updating_band=False;self._suppress_context_updates=False;self.propagation_state=PropagationSuggestionState();self._build();self._bind_formatters();self.new()
+ def __init__(self,parent,repeaters,on_save,default_power_w=None,band_callback=None):
+  super().__init__(parent,text="QSO (toate orele sunt UTC)",padding=8);self.repeaters=repeaters;self.on_save=on_save;self.default_power_w=default_power_w;self.band_callback=band_callback;self.qso_id=None;self.vars={k:tk.StringVar() for k in ("callsign","operator_name","repeater","frequency_mhz","band","mode","rst_sent","rst_received","grid_square","power_w","qsl_status","qso_start_utc","qso_end_utc","propagation_mode","satellite_name","uplink_mode","downlink_mode","distance_km","azimuth_deg")};self._formatting=False;self._updating_propagation=False;self._updating_band=False;self._suppress_context_updates=False;self.propagation_state=PropagationSuggestionState();self._build();self._bind_formatters();self.new()
  def _build(self):
   descriptions={
    "callsign":"Indicativul stației cu care ai realizat legătura.\nExemplu: YO8ABC",
@@ -53,7 +53,7 @@ class QSOForm(ttk.LabelFrame):
   self.vars["callsign"].trace_add("write",lambda *_:self._format_var("callsign",self.callsign_widget,normalize_callsign))
   self.vars["operator_name"].trace_add("write",lambda *_:self._format_var("operator_name",self.operator_name_widget,format_name_input))
   self.vars["frequency_mhz"].trace_add("write",lambda *_:self._frequency_changed())
-  self.vars["band"].trace_add("write",lambda *_:self.update_propagation_suggestion())
+  self.vars["band"].trace_add("write",lambda *_:self._band_changed())
   self.vars["mode"].trace_add("write",lambda *_:self.update_propagation_suggestion())
   self.vars["satellite_name"].trace_add("write",lambda *_:self.update_propagation_suggestion())
  def _format_var(self,key,widget,formatter):
@@ -95,6 +95,9 @@ class QSOForm(ttk.LabelFrame):
    try:self.vars["band"].set(band)
    finally:self._updating_band=False
   self.update_propagation_suggestion()
+ def _band_changed(self):
+  self.update_propagation_suggestion()
+  if self.band_callback:self.band_callback(self.vars["band"].get(), self.vars["frequency_mhz"].get())
  def update_propagation_suggestion(self,force:bool=False)->None:
   """Apply a default only when it does not replace a protected manual choice."""
   if self._suppress_context_updates or self._updating_propagation:return
