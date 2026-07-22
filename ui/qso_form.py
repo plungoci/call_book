@@ -1,126 +1,62 @@
+"""Qt QSO editor; presentation only, with domain validation kept in controllers."""
 from __future__ import annotations
-import tkinter as tk
 from datetime import datetime, timezone
-from tkinter import ttk
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QComboBox, QFormLayout, QGridLayout, QGroupBox, QLineEdit, QTextEdit, QVBoxLayout, QWidget
 from models import QSO
-from validators import band_for_frequency, format_name_input, normalize_callsign
+from propagation import PROPAGATION_MODES
 from services.band_detector import BandDetector
 from services.propagation_service import PROPAGATION_UNKNOWN
-from propagation import PROPAGATION_MODES
-from .tooltip import Tooltip
+from validators import format_name_input, normalize_callsign
 MODES=("FM","AM","SSB","USB","LSB","CW","RTTY","FT8","FT4","PSK31","DIGITAL","MSK144","EchoLink","AllStar","DMR","D-STAR","C4FM","Internet Gateway")
 QSL=("NOT_SENT","SENT","RECEIVED","CONFIRMED")
 FORM_FIELDS=(("Indicativ","callsign"),("Nume","operator_name"),("Repetor","repeater"),("Frecvență MHz","frequency_mhz"),("Bandă","band"),("Mod","mode"),("RST trimis","rst_sent"),("RST primit","rst_received"),("Locator","grid_square"),("Putere W","power_w"),("QSL","qsl_status"),("Început UTC","qso_start_utc"),("Sfârșit UTC","qso_end_utc"),("Propagare","propagation_mode"),("Satelit","satellite_name"),("Mod uplink","uplink_mode"),("Mod downlink","downlink_mode"),("Distanță km","distance_km"),("Azimut °","azimuth_deg"))
-class QSOForm(ttk.LabelFrame):
- def __init__(self,parent,repeaters,on_save,default_power_w=None,band_callback=None):
-  super().__init__(parent,text="QSO (toate orele sunt UTC)",padding=8);self.repeaters=repeaters;self.on_save=on_save;self.default_power_w=default_power_w;self.band_callback=band_callback;self.qso_id=None;self.vars={k:tk.StringVar() for k in ("callsign","operator_name","repeater","frequency_mhz","band","mode","rst_sent","rst_received","grid_square","power_w","qsl_status","qso_start_utc","qso_end_utc","propagation_mode","satellite_name","uplink_mode","downlink_mode","distance_km","azimuth_deg")};self._formatting=False;self._updating_band=False;self._suppress_context_updates=False;self.propagation_notes_value="";self._build();self._bind_formatters();self.new()
- def _build(self):
-  descriptions={
-   "callsign":"Indicativul stației cu care ai realizat legătura.\nExemplu: YO8ABC",
-   "operator_name":"Numele operatorului, dacă este cunoscut.",
-   "repeater":self._repeater_tooltip,
-   "frequency_mhz":self._frequency_tooltip,
-   "band":"Se completează automat după frecvență, dar poate fi modificată.",
-   "mode":"Modul de lucru utilizat:\nFM, SSB, CW, FT8 etc.",
-   "rst_sent":"Raportul transmis către corespondent.\nExemplu: 59 sau 599.",
-   "rst_received":"Raportul primit de la corespondent.",
-   "grid_square":"Locator Maidenhead al corespondentului.\nExemplu: KN27OD",
-   "power_w":"Puterea de emisie în wați.\nExemplu: 5 W sau 50 W.",
-   "qsl_status":"Starea confirmării QSL pentru această legătură.",
-   "qso_start_utc":"Data și ora de început a QSO-ului, în UTC.",
-   "qso_end_utc":"Data și ora de sfârșit a QSO-ului, în UTC.",
-  }
-  labels=FORM_FIELDS
-  self.frequency_notice=tk.StringVar(value="")
-  groups=(("Legătură",("callsign","operator_name","frequency_mhz","band","mode","repeater","propagation_mode")),("Raport și confirmare",("rst_sent","rst_received","power_w","qsl_status","grid_square")),("Timp și traseu",("qso_start_utc","qso_end_utc","satellite_name","uplink_mode","downlink_mode","distance_km","azimuth_deg")))
-  by_key={key:label for label,key in labels}
-  for column,(title,keys) in enumerate(groups):
-   section=ttk.Frame(self,padding=10);section.grid(row=0,column=column,sticky="nsew",padx=(0,8) if column<2 else 0)
-   ttk.Label(section,text=title).grid(row=0,column=0,sticky="w",pady=(0,6));section.columnconfigure(0,weight=1)
-   for row,key in enumerate(keys,start=1):
-    label=by_key[key]
-    ttk.Label(section,text=label).grid(row=row*2-1,column=0,sticky="w")
-    choices=("repeater","mode","qsl_status","propagation_mode")
-    widget=ttk.Combobox(section,textvariable=self.vars[key],state="readonly" if key in choices else "normal",width=28) if key in choices else ttk.Entry(section,textvariable=self.vars[key],width=30)
-    if key=="mode":widget["values"]=MODES
-    elif key=="qsl_status":widget["values"]=QSL
-    elif key=="propagation_mode":widget["values"]=PROPAGATION_MODES
-    elif key=="repeater":widget["values"]=["" ]+[f"{r['id']} — {r['name']}" for r in self.repeaters()];widget.bind("<<ComboboxSelected>>",self._repeater)
-    widget.grid(row=row*2,column=0,sticky="ew");setattr(self,key+"_widget",widget);Tooltip(widget,descriptions.get(key, f"Valoarea {label.lower()} pentru acest QSO."))
-    if key=="frequency_mhz": ttk.Label(section,textvariable=self.frequency_notice).grid(row=row*2+1,column=0,sticky="w")
-  ttk.Label(self,text="Observații").grid(row=1,column=0,sticky="w",pady=(10,2))
-  notes_frame=ttk.Frame(self,padding=8);notes_frame.grid(row=2,column=0,columnspan=3,sticky="ew")
-  self.notes=tk.Text(notes_frame,width=65,height=3,wrap="word");notes_scroll=ttk.Scrollbar(notes_frame,orient="vertical",command=self.notes.yview);self.notes.configure(yscrollcommand=notes_scroll.set);self.notes.pack(side="left",fill="both",expand=True);notes_scroll.pack(side="right",fill="y");Tooltip(self.notes,"Informații suplimentare despre QSO.")
-  for column in range(3):self.columnconfigure(column,weight=1)
- def _bind_formatters(self):
-  """Format callsign and name immediately, retaining the insertion point."""
-  self.vars["callsign"].trace_add("write",lambda *_:self._format_var("callsign",self.callsign_widget,normalize_callsign))
-  self.vars["operator_name"].trace_add("write",lambda *_:self._format_var("operator_name",self.operator_name_widget,format_name_input))
-  self.vars["frequency_mhz"].trace_add("write",lambda *_:self._frequency_changed())
-  self.vars["band"].trace_add("write",lambda *_:self._band_changed())
- def _format_var(self,key,widget,formatter):
-  if self._formatting:return
-  value=self.vars[key].get();formatted=formatter(value)
-  if value==formatted:return
-  cursor=widget.index(tk.INSERT) if widget.focus_get()==widget else len(value)
-  self._formatting=True
-  try:
-   self.vars[key].set(formatted)
-   # Formatting the prefix maps the cursor correctly even when whitespace shrinks.
-   widget.icursor(min(len(formatter(value[:cursor])),len(formatted)))
-  finally:self._formatting=False
- def _frequency_tooltip(self):
-  frequency=self.vars["frequency_mhz"].get().strip()
-  band=self.vars["band"].get().strip()
-  text=f"Frecvența utilizată pentru QSO, exprimată în MHz.\nExemplu: 145.500"
-  if frequency:text=f"Frecvență: {frequency} MHz\nBandă detectată: {band or 'necunoscută'}"
-  return text
- def _repeater_tooltip(self):
-  selected=self.vars["repeater"].get().split(" ")[0]
-  repeater=next((r for r in self.repeaters() if str(r["id"]) == selected),None)
-  if not repeater:return "Selectează repetorul utilizat.\nCompletarea automată va seta frecvența și modul."
-  details=[str(repeater["name"]),f"{repeater['output_frequency_mhz']} MHz"]
-  if repeater["shift_mhz"] is not None:details.append(f"Shift {repeater['shift_mhz'] * 1000:g} kHz")
-  if repeater["tone_hz"] is not None:details.append(f"CTCSS {repeater['tone_hz']:g} Hz")
-  return "\n".join(details)
- def _repeater(self,_):
-  text=self.vars["repeater"].get()
-  if not text:return
-  r=next(r for r in self.repeaters() if str(r["id"])==text.split(" ")[0]);self.vars["frequency_mhz"].set(r["output_frequency_mhz"]);self.vars["mode"].set(r["mode"] or "FM");self.vars["band"].set(band_for_frequency(r["output_frequency_mhz"]))
- def _frequency_changed(self):
-  """Detect the existing band from a valid frequency."""
-  if self._suppress_context_updates or self._updating_band:return
-  try: band=BandDetector.frequency_to_band(float(self.vars["frequency_mhz"].get()))
-  except ValueError:
-   self.frequency_notice.set("")
-   return
-  if band:
-   self._updating_band=True
-   try:
-    if self.vars["band"].get()!=band:self.vars["band"].set(band)
-   finally:self._updating_band=False
-   self.frequency_notice.set("")
-   # A frequency change within the same band still needs an immediate panel refresh.
-   if self.band_callback:self.band_callback(band, self.vars["frequency_mhz"].get())
-  else:
-   self.frequency_notice.set("Frecvența nu aparține unei benzi cunoscute; banda curentă este păstrată.")
- def _band_changed(self):
-  if self._updating_band:return
-  if self.band_callback:self.band_callback(self.vars["band"].get(), self.vars["frequency_mhz"].get())
- def new(self):
-  self.qso_id=None;self._suppress_context_updates=True
-  try:
-   for var in self.vars.values():var.set("")
-   self.vars["qso_start_utc"].set(datetime.now(timezone.utc).replace(microsecond=0).isoformat());self.vars["mode"].set("FM");self.vars["qsl_status"].set("NOT_SENT");self.vars["propagation_mode"].set(PROPAGATION_UNKNOWN);self.vars["power_w"].set("" if self.default_power_w is None else f"{self.default_power_w:g}")
-  finally:self._suppress_context_updates=False
-  self.propagation_notes_value="";self.notes.delete("1.0","end");self.callsign_widget.focus_set()
- def load(self,q:QSO):
-  self.qso_id=q.id;self._suppress_context_updates=True
-  try:
-   for key in self.vars:
-    if hasattr(q,key):self.vars[key].set(str(getattr(q,key) or ""))
-   self.vars["repeater"].set(f"{q.repeater_id} —" if q.repeater_id else "")
-  finally:self._suppress_context_updates=False
-  self.notes.delete("1.0","end");self.notes.insert("1.0",q.notes);self.propagation_notes_value=q.propagation_notes
- def value(self)->QSO:
-  v=self.vars; rep=v["repeater"].get().split(" ")[0];return QSO(id=self.qso_id,callsign=v["callsign"].get(),operator_name=v["operator_name"].get(),repeater_id=int(rep) if rep.isdigit() else None,frequency_mhz=float(v["frequency_mhz"].get()),band=v["band"].get(),mode=v["mode"].get(),rst_sent=v["rst_sent"].get(),rst_received=v["rst_received"].get(),grid_square=v["grid_square"].get(),power_w=float(v["power_w"].get()) if v["power_w"].get() else None,qsl_status=v["qsl_status"].get(),qso_start_utc=v["qso_start_utc"].get(),qso_end_utc=v["qso_end_utc"].get(),notes=self.notes.get("1.0","end-1c"),propagation_mode=v["propagation_mode"].get(),satellite_name=v["satellite_name"].get(),uplink_mode=v["uplink_mode"].get(),downlink_mode=v["downlink_mode"].get(),distance_km=float(v["distance_km"].get()) if v["distance_km"].get() else None,azimuth_deg=float(v["azimuth_deg"].get()) if v["azimuth_deg"].get() else None,propagation_notes=self.propagation_notes_value)
+class QSOForm(QGroupBox):
+    contextChanged=Signal(str,str)
+    def __init__(self, repeaters, default_power_w=None):
+        super().__init__("QSO · toate orele sunt UTC"); self.repeaters=repeaters; self.default_power_w=default_power_w; self.qso_id=None; self.fields={}; self._loading=False
+        layout=QVBoxLayout(self); grid=QGridLayout(); layout.addLayout(grid); labels=dict(FORM_FIELDS)
+        groups=(("Legătură",("callsign","operator_name","frequency_mhz","band","mode","repeater","propagation_mode")),("Raport și confirmare",("rst_sent","rst_received","power_w","qsl_status","grid_square")),("Timp și traseu",("qso_start_utc","qso_end_utc","satellite_name","uplink_mode","downlink_mode","distance_km","azimuth_deg")))
+        for col,(title,keys) in enumerate(groups):
+            box=QGroupBox(title); form=QFormLayout(box); grid.addWidget(box,0,col)
+            for key in keys:
+                widget=QComboBox() if key in {"repeater","mode","qsl_status","propagation_mode"} else QLineEdit()
+                if isinstance(widget,QComboBox):
+                    widget.setEditable(key=="repeater"); widget.addItems({"mode":MODES,"qsl_status":QSL,"propagation_mode":PROPAGATION_MODES}.get(key,[]))
+                    if key=="repeater": widget.currentTextChanged.connect(self._repeater)
+                widget.setToolTip(f"Valoarea {labels[key].lower()} pentru acest QSO."); form.addRow(labels[key],widget); self.fields[key]=widget
+        self.notes=QTextEdit(); self.notes.setFixedHeight(72); self.notes.setToolTip("Informații suplimentare despre QSO."); layout.addWidget(self.notes)
+        self._line("callsign").editingFinished.connect(lambda:self._format("callsign",normalize_callsign)); self._line("operator_name").editingFinished.connect(lambda:self._format("operator_name",format_name_input)); self._line("frequency_mhz").textChanged.connect(self._frequency_changed); self._line("band").textChanged.connect(self._context)
+        self.new()
+    def _line(self,key): return self.fields[key]
+    def text(self,key): return self.fields[key].currentText() if isinstance(self.fields[key],QComboBox) else self.fields[key].text()
+    def set_text(self,key,value):
+        w=self.fields[key]; (w.setCurrentText(str(value)) if isinstance(w,QComboBox) else w.setText(str(value)))
+    def _format(self,key,formatter): self.set_text(key,formatter(self.text(key)))
+    def _frequency_changed(self,value):
+        if self._loading:return
+        try: band=BandDetector.frequency_to_band(float(value))
+        except ValueError: return
+        if band: self.set_text("band",band)
+        self._context()
+    def _context(self,*_):
+        if not self._loading:self.contextChanged.emit(self.text("band"),self.text("frequency_mhz"))
+    def _repeater(self,text):
+        if self._loading or not text:return
+        rid=text.split(" ")[0]; r=next((x for x in self.repeaters() if str(x["id"])==rid),None)
+        if r: self.set_text("frequency_mhz",r["output_frequency_mhz"]); self.set_text("mode",r["mode"] or "FM")
+    def refresh_repeaters(self):
+        w=self.fields["repeater"]; current=w.currentText(); w.blockSignals(True); w.clear(); w.addItem(""); w.addItems([f'{r["id"]} — {r["name"]}' for r in self.repeaters()]); w.setCurrentText(current); w.blockSignals(False)
+    def new(self):
+        self._loading=True; self.qso_id=None
+        for key in self.fields:self.set_text(key,"")
+        self.set_text("qso_start_utc",datetime.now(timezone.utc).replace(microsecond=0).isoformat()); self.set_text("mode","FM"); self.set_text("qsl_status","NOT_SENT"); self.set_text("propagation_mode",PROPAGATION_UNKNOWN); self.set_text("power_w","" if self.default_power_w is None else f"{self.default_power_w:g}"); self.notes.clear(); self._loading=False; self.fields["callsign"].setFocus()
+    def load(self,q):
+        self._loading=True; self.qso_id=q.id
+        for key in self.fields:
+            if key=="repeater": self.set_text(key,f"{q.repeater_id} —" if q.repeater_id else "")
+            elif hasattr(q,key): self.set_text(key,getattr(q,key) or "")
+        self.notes.setPlainText(q.notes); self._loading=False
+    def value(self):
+        rep=self.text("repeater").split(" ")[0]; t=self.text
+        return QSO(id=self.qso_id,callsign=t("callsign"),operator_name=t("operator_name"),repeater_id=int(rep) if rep.isdigit() else None,frequency_mhz=float(t("frequency_mhz")),band=t("band"),mode=t("mode"),rst_sent=t("rst_sent"),rst_received=t("rst_received"),grid_square=t("grid_square"),power_w=float(t("power_w")) if t("power_w") else None,qsl_status=t("qsl_status"),qso_start_utc=t("qso_start_utc"),qso_end_utc=t("qso_end_utc"),notes=self.notes.toPlainText(),propagation_mode=t("propagation_mode"),satellite_name=t("satellite_name"),uplink_mode=t("uplink_mode"),downlink_mode=t("downlink_mode"),distance_km=float(t("distance_km")) if t("distance_km") else None,azimuth_deg=float(t("azimuth_deg")) if t("azimuth_deg") else None)

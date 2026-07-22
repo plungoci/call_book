@@ -1,198 +1,29 @@
-"""Compact Tk presentation for multi-provider space-weather conditions."""
-from __future__ import annotations
-
-from concurrent.futures import ThreadPoolExecutor
+"""Thread-safe Qt propagation dashboard."""
 from datetime import datetime, timezone
-import tkinter as tk
-from tkinter import ttk
-
-from propagation_models import SpaceWeatherData
+from PySide6.QtCore import QObject, QThread, QTimer, Signal
+from PySide6.QtWidgets import QGridLayout,QGroupBox,QHBoxLayout,QLabel,QPushButton,QTableWidget,QTableWidgetItem,QVBoxLayout,QWidget
 from services.propagation_estimator import PropagationEstimator
 from services.space_weather_service import SpaceWeatherService
-from .tooltip import Tooltip
-
-
-class PropagationPanel(ttk.LabelFrame):
-    """Keeps valid readings visible while NOAA requests run in a worker thread."""
-
-    _RATING_COLORS = {
-        "Foarte slabă": "#b91c1c",
-        "Slabă": "#c2410c",
-        "Moderată": "#a16207",
-        "Bună": "#15803d",
-        "Foarte bună": "#166534",
-        "Excelentă": "#0369a1",
-    }
-
-    def __init__(self, parent: tk.Misc) -> None:
-        super().__init__(parent, text="Condiții de propagare", padding=8)
-        self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="space-weather")
-        self.request_id = 0
-        self.after_id: str | None = None
-        self.closing = False
-        self._estimator = PropagationEstimator()
-
-        top = ttk.Frame(self)
-        top.pack(fill="x")
-        self.status = tk.StringVar(value="Selectează o bandă pentru actualizarea datelor disponibile.")
-        ttk.Label(top, textvariable=self.status).pack(side="left")
-        self.refresh_button = ttk.Button(top, text="Actualizează", command=lambda: self.refresh(force=True))
-        self.refresh_button.pack(side="right")
-        Tooltip(self.refresh_button, "Descarcă date din sursele disponibile și actualizează tabelul fără a recrea panoul.")
-
-        weather_frame = ttk.LabelFrame(self, text="☀  Space Weather", padding=10)
-        weather_frame.pack(fill="x", pady=(8, 4))
-        self.updated = tk.StringVar(value="—")
-        self.source = tk.StringVar(value="—")
-        self._metric_values = {name: tk.StringVar(value="—") for name in (
-            "SFI", "SSN", "K Index", "A Index", "X-Ray Flux", "Proton Flux",
-            "Electron Flux", "Auroral Activity", "Bz", "Bt", "Solar Wind", "Densitate particule", "Temperatură vânt", "Ap",
-        )}
-        metadata = ttk.Frame(weather_frame)
-        metadata.grid(row=0, column=0, columnspan=4, sticky="ew", pady=(0, 8))
-        ttk.Label(metadata, text="Actualizat:").pack(side="left")
-        ttk.Label(metadata, textvariable=self.updated).pack(side="left", padx=(4, 18))
-        ttk.Label(metadata, text="Sursă:").pack(side="left")
-        ttk.Label(metadata, textvariable=self.source).pack(side="left", padx=4)
-        metric_names = list(self._metric_values)
-        for index, name in enumerate(metric_names):
-            row, column = divmod(index, 4)
-            frame = ttk.Frame(weather_frame, padding=8)
-            frame.grid(row=row + 1, column=column, sticky="nsew", padx=3, pady=3)
-            ttk.Label(frame, text=name).pack(anchor="w")
-            ttk.Label(frame, textvariable=self._metric_values[name], wraplength=210).pack(anchor="w", pady=(3, 0))
-        for column in range(4):
-            weather_frame.columnconfigure(column, weight=1)
-
-        hf_frame = ttk.LabelFrame(self, text="HF Conditions", padding=6)
-        hf_frame.pack(fill="x", pady=4)
-        self.conditions = ttk.Frame(hf_frame)
-        self.conditions.pack(fill="x")
-        for column, heading in enumerate(("Bandă", "Zi", "Noapte", "Scor", "Încredere")):
-            ttk.Label(self.conditions, text=heading).grid(row=0, column=column, sticky="w", padx=(0, 22))
-        self._condition_values: dict[str, tuple[tk.StringVar, tk.StringVar, tk.StringVar, tk.StringVar]] = {}
-        self._condition_labels: dict[str, tuple[tk.Label, tk.Label]] = {}
-        for row, band in enumerate(("80m", "40m", "20m", "15m", "10m"), start=1):
-            ttk.Label(self.conditions, text=band).grid(row=row, column=0, sticky="w", padx=(0, 22))
-            day, night, score, confidence = tk.StringVar(value="—"), tk.StringVar(value="—"), tk.StringVar(value="—"), tk.StringVar(value="—")
-            day_label = tk.Label(self.conditions, textvariable=day, anchor="w")
-            night_label = tk.Label(self.conditions, textvariable=night, anchor="w")
-            day_label.grid(row=row, column=1, sticky="w", padx=(0, 22))
-            night_label.grid(row=row, column=2, sticky="w")
-            ttk.Label(self.conditions, textvariable=score).grid(row=row, column=3, sticky="w", padx=(0, 22))
-            ttk.Label(self.conditions, textvariable=confidence).grid(row=row, column=4, sticky="w")
-            self._condition_values[band] = (day, night, score, confidence)
-            self._condition_labels[band] = (day_label, night_label)
-
-        geomagnetic = ttk.LabelFrame(self, text="Geomagnetic", padding=6)
-        geomagnetic.pack(fill="x", pady=(4, 0))
-        self._geomagnetic = tk.StringVar(value="Aurora: —    Bz: —    Solar Wind: —")
-        ttk.Label(geomagnetic, textvariable=self._geomagnetic).pack(anchor="w")
-
-    @staticmethod
-    def _add_pair(parent: ttk.Frame, row: int, label: str, value: tk.StringVar) -> None:
-        ttk.Label(parent, text=f"{label}:", width=20).grid(row=row, column=0, sticky="w", pady=1)
-        ttk.Label(parent, textvariable=value).grid(row=row, column=1, sticky="w", pady=1)
-
-    def schedule(self, band: str, frequency: float | None = None, delay: int = 700) -> None:
-        """Debounce form changes; the compact forecast always contains all HF bands."""
-        del frequency
-        if self.after_id:
-            try:
-                self.after_cancel(self.after_id)
-            except tk.TclError:
-                pass
-        if not (band or "").strip():
-            return
-        self.request_id += 1
-        request_id = self.request_id
-        self.after_id = self.after(delay, lambda: self._start(request_id, force=False))
-
-    def refresh(self, force: bool = True) -> None:
-        """Request fresh NOAA data without rebuilding any widget."""
-        if self.after_id:
-            try:
-                self.after_cancel(self.after_id)
-            except tk.TclError:
-                pass
-        self.request_id += 1
-        self._start(self.request_id, force=force)
-
-    def _start(self, request_id: int, force: bool) -> None:
-        if self.closing or request_id != self.request_id:
-            return
-        self.status.set("Se descarcă date din sursele disponibile…")
-        self.refresh_button.config(state="disabled")
-        future = self.executor.submit(SpaceWeatherService().fetch, force)
-        future.add_done_callback(lambda result: self.after(0, lambda: self._finish(request_id, result)))
-
-    def _finish(self, request_id: int, future: object) -> None:
-        if self.closing or request_id != self.request_id:
-            return
-        self.refresh_button.config(state="normal")
-        try:
-            self.update_values(future.result())  # type: ignore[union-attr]
-            self.status.set("Actualizat")
-        except Exception:
-            self.status.set("Ultima actualizare nu a reușit.")
-
-    def update_values(self, weather: SpaceWeatherData) -> None:
-        """Apply a successful result in place and retain it for future failures."""
-        self.updated.set(weather.observed_at_utc.astimezone(timezone.utc).strftime("%d-%m-%Y %H:%M UTC"))
-        self.source.set(weather.source or "—")
-        values = {
-            "SFI": weather.solar_flux,
-            "SSN": weather.sunspot_number,
-            "K Index": weather.kp_index,
-            "A Index": weather.a_index,
-            "X-Ray Flux": weather.xray_flux,
-            "Proton Flux": weather.proton_flux,
-            "Electron Flux": weather.electron_flux,
-            "Auroral Activity": weather.auroral_activity,
-            "Bz": weather.bz,
-            "Bt": weather.bt,
-            "Solar Wind": weather.solar_wind_speed,
-            "Densitate particule": weather.solar_wind_density,
-            "Temperatură vânt": weather.solar_wind_temperature,
-            "Ap": weather.ap_index,
-        }
-        for name, value in values.items():
-            key = {"SFI":"solar_flux", "SSN":"sunspot_number", "K Index":"kp_index", "A Index":"a_index", "X-Ray Flux":"xray_flux", "Proton Flux":"proton_flux", "Electron Flux":"electron_flux", "Auroral Activity":"auroral_activity", "Bz":"bz", "Bt":"bt", "Solar Wind":"solar_wind_speed", "Densitate particule":"solar_wind_density", "Temperatură vânt":"solar_wind_temperature", "Ap":"ap_index"}[name]
-            measurement = weather.measurement(key)
-            self._metric_values[name].set(self._format_measurement(value, measurement.unit if measurement else "", measurement.source if measurement else "—", measurement.age_seconds if measurement else None))
-        self._geomagnetic.set(
-            f"Aurora: {self._format_value(weather.auroral_activity)}%    "
-            f"Bz: {self._format_value(weather.bz)} nT    "
-            f"Solar Wind: {self._format_value(weather.solar_wind_speed)} km/s"
-        )
-        for band, (day, night) in self._estimator.calculate_hf(weather, datetime.now(timezone.utc)).items():
-            day_value, night_value, score_value, confidence_value = self._condition_values[band]
-            day_label, night_label = self._condition_labels[band]
-            day_value.set(day.rating)
-            night_value.set(night.rating)
-            score_value.set(f"{(day.score + night.score) / 2:.0f}/100")
-            confidence_value.set(day.confidence.capitalize())
-            day_label.config(fg=self._RATING_COLORS.get(day.rating, ""))
-            night_label.config(fg=self._RATING_COLORS.get(night.rating, ""))
-
-    @staticmethod
-    def _format_value(value: float | str | None) -> str:
-        if value is None:
-            return "N/A"
-        return f"{value:g}" if isinstance(value, float) else str(value)
-
-    @classmethod
-    def _format_measurement(cls, value: float | str | None, unit: str, source: str, age_seconds: int | None) -> str:
-        if value is None:
-            return "N/A (fără sursă validă)"
-        age = "?" if age_seconds is None else (f"{age_seconds // 60} min" if age_seconds < 3600 else f"{age_seconds // 3600} h")
-        return f"{cls._format_value(value)} {unit} [{source}, {age}]".strip()
-
-    def shutdown(self) -> None:
-        self.closing = True
-        if self.after_id:
-            try:
-                self.after_cancel(self.after_id)
-            except tk.TclError:
-                pass
-        self.executor.shutdown(wait=False, cancel_futures=True)
+class Worker(QObject):
+    finished=Signal(object); failed=Signal()
+    def __init__(self,force): super().__init__(); self.force=force
+    def run(self):
+        try:self.finished.emit(SpaceWeatherService().fetch(self.force))
+        except Exception:self.failed.emit()
+class PropagationPanel(QGroupBox):
+    def __init__(self,parent=None):
+        super().__init__('Condiții de propagare',parent); self.estimator=PropagationEstimator(); self.timer=QTimer(self); self.timer.setSingleShot(True); self.timer.timeout.connect(lambda:self.refresh(False)); l=QVBoxLayout(self); top=QHBoxLayout(); self.status=QLabel('Selectează o bandă pentru actualizare.'); self.button=QPushButton('Actualizează'); self.button.clicked.connect(lambda:self.refresh(True)); top.addWidget(self.status);top.addStretch();top.addWidget(self.button);l.addLayout(top); self.metrics=QGridLayout(); box=QGroupBox('Space Weather');box.setLayout(self.metrics);l.addWidget(box); self.metric_labels={};
+        for i,name in enumerate(('SFI','SSN','K Index','A Index','X-Ray Flux','Proton Flux','Electron Flux','Auroral Activity','Bz','Bt','Solar Wind','Densitate','Temperatură','Ap')):
+            label=QLabel(f'<b>{name}</b><br>—');label.setWordWrap(True);self.metrics.addWidget(label,i//4,i%4);self.metric_labels[name]=label
+        self.table=QTableWidget(5,5);self.table.setHorizontalHeaderLabels(('Bandă','Zi','Noapte','Scor','Încredere'));self.table.setVerticalHeaderLabels(('80m','40m','20m','15m','10m'));self.table.verticalHeader().setVisible(False);l.addWidget(self.table)
+    def schedule(self,band,frequency=None,delay=700):
+        if band.strip():self.timer.start(delay)
+    def refresh(self,force=True):
+        self.button.setEnabled(False);self.status.setText('Se descarcă date…');self.thread=QThread(self);self.worker=Worker(force);self.worker.moveToThread(self.thread);self.thread.started.connect(self.worker.run);self.worker.finished.connect(self.update_values);self.worker.finished.connect(self.thread.quit);self.worker.failed.connect(lambda:self.status.setText('Ultima actualizare nu a reușit.'));self.worker.failed.connect(self.thread.quit);self.thread.finished.connect(lambda:self.button.setEnabled(True));self.thread.start()
+    def update_values(self,w):
+        self.status.setText(f'Actualizat · {w.observed_at_utc.astimezone(timezone.utc):%d-%m-%Y %H:%M UTC}'); vals={'SFI':w.solar_flux,'SSN':w.sunspot_number,'K Index':w.kp_index,'A Index':w.a_index,'X-Ray Flux':w.xray_flux,'Proton Flux':w.proton_flux,'Electron Flux':w.electron_flux,'Auroral Activity':w.auroral_activity,'Bz':w.bz,'Bt':w.bt,'Solar Wind':w.solar_wind_speed,'Densitate':w.solar_wind_density,'Temperatură':w.solar_wind_temperature,'Ap':w.ap_index}
+        for k,v in vals.items():self.metric_labels[k].setText(f'<b>{k}</b><br>{"N/A" if v is None else v}')
+        for r,(band,(day,night)) in enumerate(self.estimator.calculate_hf(w,datetime.now(timezone.utc)).items()):
+            for c,v in enumerate((band,day.rating,night.rating,f'{(day.score+night.score)/2:.0f}/100',day.confidence.capitalize())):self.table.setItem(r,c,QTableWidgetItem(v))
+    def shutdown(self):
+        if hasattr(self,'thread') and self.thread.isRunning():self.thread.quit();self.thread.wait(1000)
