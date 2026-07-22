@@ -203,9 +203,10 @@ class MainWindow(tk.Tk):
         else: self.search_entry.focus_set()
         return "break"
     def _table(self, parent: tk.Misc) -> None:
-        columns = ("id", "date", "time", "callsign", "name", "freq", "band", "mode", "repeater", "sent", "received", "qsl"); self.tree = ttk.Treeview(parent, columns=columns, show="headings")
+        columns = ("id", "date", "time", "callsign", "name", "freq", "band", "mode", "repeater", "sent", "received", "qsl")
+        self.table_container, self.tree = attach_tree_scrollbars(parent, columns=columns, show="headings")
         for column in columns: self.tree.heading(column, text=column.upper()); self.tree.column(column, width=105, minwidth=70, stretch=True)
-        self.table_container = attach_tree_scrollbars(parent, self.tree); self.table_container.pack(fill="both", expand=True); self.tree.bind("<<TreeviewSelect>>", self.selection_changed); Tooltip(self.tree, "Lista QSO-urilor salvate.")
+        self.table_container.pack(fill="both", expand=True); self.tree.bind("<<TreeviewSelect>>", self.selection_changed); Tooltip(self.tree, "Lista QSO-urilor salvate.")
     def filters(self) -> dict[str, str]: return {"callsign": self.search.get(), "band": self.band.get(), "mode": self.mode.get(), "repeater_id": self.rep.get(), "date_from": self.date_from.get(), "date_to": self.date_to.get()}
     def refresh(self) -> None:
         self.tree.delete(*self.tree.get_children())

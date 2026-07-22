@@ -38,10 +38,10 @@ class RepeaterWindow(tk.Toplevel):
         ttk.Button(buttons, text="Salvează", command=self.save).pack(side="left", padx=3)
         ttk.Button(buttons, text="Șterge", command=self.delete).pack(side="left", padx=3)
         ttk.Button(buttons, text="Nou", command=self.clear).pack(side="left", padx=3)
-        self.tree = ttk.Treeview(self, columns=("id", "name", "freq", "location"), show="headings")
+        self.table_container, self.tree = attach_tree_scrollbars(self, columns=("id", "name", "freq", "location"), show="headings")
         for key, label, width in (("id", "ID", 55), ("name", "Nume", 180), ("freq", "Frecvență", 120), ("location", "Locație", 170)):
             self.tree.heading(key, text=label); self.tree.column(key, width=width, stretch=True)
-        attach_tree_scrollbars(self, self.tree).grid(row=0, column=1, sticky="nsew", padx=(0, 10), pady=10)
+        self.table_container.grid(row=0, column=1, sticky="nsew", padx=(0, 10), pady=10)
         self.tree.bind("<<TreeviewSelect>>", self.select); Tooltip(self.tree, "Lista repetoarelor. Selectează un rând pentru editare.")
 
     def refresh(self) -> None:

@@ -32,9 +32,18 @@ class ScrollableFrame(ttk.Frame):
         self.canvas.yview_scroll(-int(event.delta / 120), "units")
 
 
-def attach_tree_scrollbars(parent: tk.Misc, tree: ttk.Treeview) -> ttk.Frame:
-    """Place a Treeview with both scrollbars in a responsive container."""
+def attach_tree_scrollbars(
+    parent: tk.Misc, **tree_options: object
+) -> tuple[ttk.Frame, ttk.Treeview]:
+    """Create a Treeview and its scrollbars in an isolated grid container.
+
+    The returned container may be managed by either ``pack`` or ``grid`` by its
+    caller.  Keeping the tree and its scrollbars as children of that container
+    prevents their internal grid layout from conflicting with the caller's
+    layout manager.
+    """
     holder = ttk.Frame(parent)
+    tree = ttk.Treeview(holder, **tree_options)
     vertical = ttk.Scrollbar(holder, orient="vertical", command=tree.yview)
     horizontal = ttk.Scrollbar(holder, orient="horizontal", command=tree.xview)
     tree.configure(yscrollcommand=vertical.set, xscrollcommand=horizontal.set)
@@ -42,4 +51,4 @@ def attach_tree_scrollbars(parent: tk.Misc, tree: ttk.Treeview) -> ttk.Frame:
     vertical.grid(row=0, column=1, sticky="ns")
     horizontal.grid(row=1, column=0, sticky="ew")
     holder.columnconfigure(0, weight=1); holder.rowconfigure(0, weight=1)
-    return holder
+    return holder, tree
