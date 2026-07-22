@@ -10,18 +10,20 @@ from excel_export import export_excel
 from backup import create_backup
 from .qso_form import QSOForm
 from .repeater_window import RepeaterWindow
+from .tooltip import Tooltip
 class MainWindow(tk.Tk):
  def __init__(self,db:Database,config:dict[str,str]):
-  super().__init__();self.db=db;self.config=config;self.title("Radio Logbook");self.geometry("1250x760");self.clock=ttk.Label(self);self.clock.pack(anchor="e",padx=8);self._clock();self._filters();self.form=QSOForm(self,self.db.list_repeaters,self.save);self.form.pack(fill="x",padx=8);ttk.Button(self,text="Salvează QSO",command=self.save).pack();self._table();self.bind_all("<Control-n>",lambda e:self.form.new());self.bind_all("<Control-s>",lambda e:self.save());self.bind_all("<Delete>",lambda e:self.delete());self.bind_all("<Escape>",lambda e:self.form.new());self.bind_all("<Control-f>",lambda e:self.search.focus_set());self.refresh()
+  super().__init__();self.db=db;self.config=config;self.title("Radio Logbook");self.geometry("1250x760");self.clock=ttk.Label(self);self.clock.pack(anchor="e",padx=8);self._clock();self._filters();self.form=QSOForm(self,self.db.list_repeaters,self.save);self.form.pack(fill="x",padx=8);actions=ttk.Frame(self);actions.pack();save=ttk.Button(actions,text="Salvează QSO",command=self.save);save.pack(side="left");Tooltip(save,"Salvează QSO-ul în baza de date.");new=ttk.Button(actions,text="QSO nou",command=self.form.new);new.pack(side="left");Tooltip(new,"Golește formularul și pregătește introducerea unei noi legături.");self._table();self.bind_all("<Control-n>",lambda e:self.form.new());self.bind_all("<Control-s>",lambda e:self.save());self.bind_all("<Delete>",lambda e:self.delete());self.bind_all("<Escape>",lambda e:self.form.new());self.bind_all("<Control-f>",lambda e:self.search.focus_set());self.refresh()
  def _clock(self):
   now=datetime.now().astimezone();utc=datetime.now(timezone.utc);self.clock.config(text=f"Local: {now:%Y-%m-%d %H:%M:%S %Z} | UTC: {utc:%Y-%m-%d %H:%M:%S}");self.after(1000,self._clock)
  def _filters(self):
   bar=ttk.Frame(self);bar.pack(fill="x",padx=8);self.search=tk.StringVar();self.band=tk.StringVar();self.mode=tk.StringVar();self.rep=tk.StringVar();self.date_from=tk.StringVar();self.date_to=tk.StringVar()
-  for label,var in (("Indicativ",self.search),("Bandă",self.band),("Mod",self.mode),("Repetor ID",self.rep),("De la",self.date_from),("Până la",self.date_to)):
-   ttk.Label(bar,text=label).pack(side="left");ttk.Entry(bar,textvariable=var,width=12).pack(side="left")
-  ttk.Button(bar,text="Caută",command=self.refresh).pack(side="left");ttk.Button(bar,text="Reset",command=self.reset).pack(side="left");ttk.Button(bar,text="Repetoare",command=lambda:RepeaterWindow(self,self.db,self.repeater_changed)).pack(side="right");ttk.Button(bar,text="Backup",command=self.backup).pack(side="right");ttk.Button(bar,text="Excel",command=self.excel).pack(side="right");ttk.Button(bar,text="ADIF",command=self.adif).pack(side="right")
+  for label,var,tip in (("Indicativ",self.search,"Filtrează rapid QSO-urile după indicativ."),("Bandă",self.band,"Filtrează QSO-urile după bandă."),("Mod",self.mode,"Filtrează QSO-urile după modul de lucru."),("Repetor ID",self.rep,"Filtrează QSO-urile după repetor."),("De la",self.date_from,"Afișează QSO-uri de la această dată."),("Până la",self.date_to,"Afișează QSO-uri până la această dată.")):
+   ttk.Label(bar,text=label).pack(side="left");entry=ttk.Entry(bar,textvariable=var,width=12);entry.pack(side="left");Tooltip(entry,tip)
+  for text,command,tip,side in (("Caută",self.refresh,"Filtrează rapid QSO-urile după indicativ.","left"),("Reset",self.reset,"Șterge toate filtrele de căutare.","left"),("Repetoare",lambda:RepeaterWindow(self,self.db,self.repeater_changed),"Administrează lista de repetoare.","right"),("Backup",self.backup,"Creează un backup al bazei de date SQLite.","right"),("Excel",self.excel,"Exportă toate QSO-urile într-un fișier Excel.","right"),("ADIF",self.adif,"Exportă logbook-ul în format ADIF compatibil cu alte aplicații.","right")):
+   button=ttk.Button(bar,text=text,command=command);button.pack(side=side);Tooltip(button,tip)
  def _table(self):
-  cols=("id","date","time","callsign","name","freq","band","mode","repeater","sent","received","qsl");self.tree=ttk.Treeview(self,columns=cols,show="headings");[self.tree.heading(c,text=c.upper()) for c in cols];self.tree.pack(fill="both",expand=True,padx=8,pady=8);self.tree.bind("<<TreeviewSelect>>",self.load)
+  cols=("id","date","time","callsign","name","freq","band","mode","repeater","sent","received","qsl");self.tree=ttk.Treeview(self,columns=cols,show="headings");[self.tree.heading(c,text=c.upper()) for c in cols];self.tree.pack(fill="both",expand=True,padx=8,pady=8);self.tree.bind("<<TreeviewSelect>>",self.load);Tooltip(self.tree,"Lista QSO-urilor salvate. Selectează un rând pentru a-l încărca în formular.")
  def filters(self):return {"callsign":self.search.get(),"band":self.band.get(),"mode":self.mode.get(),"repeater_id":self.rep.get(),"date_from":self.date_from.get(),"date_to":self.date_to.get()}
  def refresh(self):
   self.tree.delete(*self.tree.get_children())
