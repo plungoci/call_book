@@ -32,21 +32,26 @@ class QSOForm(ttk.LabelFrame):
   }
   labels=FORM_FIELDS
   self.frequency_notice=tk.StringVar(value="")
-  for i,(label,key) in enumerate(labels):
-   ttk.Label(self,text=label).grid(row=i//2*2,column=i%2*2,sticky="w",padx=3)
-   choices=("repeater","mode","qsl_status","propagation_mode")
-   widget=ttk.Combobox(self,textvariable=self.vars[key],state="readonly" if key in choices else "normal",width=28) if key in choices else ttk.Entry(self,textvariable=self.vars[key],width=30)
-   if key=="mode":widget["values"]=MODES
-   elif key=="qsl_status":widget["values"]=QSL
-   elif key=="propagation_mode":widget["values"]=PROPAGATION_MODES
-   elif key=="repeater":widget["values"]=["" ]+[f"{r['id']} — {r['name']}" for r in self.repeaters()];widget.bind("<<ComboboxSelected>>",self._repeater)
-   widget.grid(row=i//2*2+1,column=i%2*2,sticky="ew",padx=3);setattr(self,key+"_widget",widget);Tooltip(widget,descriptions.get(key, f"Valoarea {label.lower()} pentru acest QSO."))
-   if key=="frequency_mhz": ttk.Label(self,textvariable=self.frequency_notice,foreground="#a16207").grid(row=i//2*2+2,column=i%2*2,sticky="w",padx=3)
-  notes_row=((len(labels)+1)//2)*2
-  ttk.Label(self,text="Observații").grid(row=notes_row,column=0,sticky="w")
-  notes_frame=ttk.Frame(self);notes_frame.grid(row=notes_row+1,column=0,columnspan=4,sticky="ew",padx=3)
+  groups=(("Legătură",("callsign","operator_name","frequency_mhz","band","mode","repeater","propagation_mode")),("Raport și confirmare",("rst_sent","rst_received","power_w","qsl_status","grid_square")),("Timp și traseu",("qso_start_utc","qso_end_utc","satellite_name","uplink_mode","downlink_mode","distance_km","azimuth_deg")))
+  by_key={key:label for label,key in labels}
+  for column,(title,keys) in enumerate(groups):
+   section=ttk.Frame(self,style="Card.TFrame",padding=10);section.grid(row=0,column=column,sticky="nsew",padx=(0,8) if column<2 else 0)
+   ttk.Label(section,text=title,style="Section.TLabel").grid(row=0,column=0,sticky="w",pady=(0,6));section.columnconfigure(0,weight=1)
+   for row,key in enumerate(keys,start=1):
+    label=by_key[key]
+    ttk.Label(section,text=label,style="CardMuted.TLabel").grid(row=row*2-1,column=0,sticky="w")
+    choices=("repeater","mode","qsl_status","propagation_mode")
+    widget=ttk.Combobox(section,textvariable=self.vars[key],state="readonly" if key in choices else "normal",width=28) if key in choices else ttk.Entry(section,textvariable=self.vars[key],width=30)
+    if key=="mode":widget["values"]=MODES
+    elif key=="qsl_status":widget["values"]=QSL
+    elif key=="propagation_mode":widget["values"]=PROPAGATION_MODES
+    elif key=="repeater":widget["values"]=["" ]+[f"{r['id']} — {r['name']}" for r in self.repeaters()];widget.bind("<<ComboboxSelected>>",self._repeater)
+    widget.grid(row=row*2,column=0,sticky="ew");setattr(self,key+"_widget",widget);Tooltip(widget,descriptions.get(key, f"Valoarea {label.lower()} pentru acest QSO."))
+    if key=="frequency_mhz": ttk.Label(section,textvariable=self.frequency_notice,foreground="#d9903d",style="Card.TLabel").grid(row=row*2+1,column=0,sticky="w")
+  ttk.Label(self,text="Observații",style="Section.TLabel").grid(row=1,column=0,sticky="w",pady=(10,2))
+  notes_frame=ttk.Frame(self,style="Card.TFrame",padding=8);notes_frame.grid(row=2,column=0,columnspan=3,sticky="ew")
   self.notes=tk.Text(notes_frame,width=65,height=3,wrap="word");notes_scroll=ttk.Scrollbar(notes_frame,orient="vertical",command=self.notes.yview);self.notes.configure(yscrollcommand=notes_scroll.set);self.notes.pack(side="left",fill="both",expand=True);notes_scroll.pack(side="right",fill="y");Tooltip(self.notes,"Informații suplimentare despre QSO.")
-  for column in range(4):self.columnconfigure(column,weight=1)
+  for column in range(3):self.columnconfigure(column,weight=1)
  def _bind_formatters(self):
   """Format callsign and name immediately, retaining the insertion point."""
   self.vars["callsign"].trace_add("write",lambda *_:self._format_var("callsign",self.callsign_widget,normalize_callsign))

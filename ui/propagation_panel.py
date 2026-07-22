@@ -40,7 +40,7 @@ class PropagationPanel(ttk.LabelFrame):
         self.refresh_button.pack(side="right")
         Tooltip(self.refresh_button, "Descarcă date din sursele disponibile și actualizează tabelul fără a recrea panoul.")
 
-        weather_frame = ttk.LabelFrame(self, text="Space Weather", padding=6)
+        weather_frame = ttk.LabelFrame(self, text="☀  Space Weather", padding=10)
         weather_frame.pack(fill="x", pady=(8, 4))
         self.updated = tk.StringVar(value="—")
         self.source = tk.StringVar(value="—")
@@ -48,34 +48,40 @@ class PropagationPanel(ttk.LabelFrame):
             "SFI", "SSN", "K Index", "A Index", "X-Ray Flux", "Proton Flux",
             "Electron Flux", "Auroral Activity", "Bz", "Bt", "Solar Wind", "Densitate particule", "Temperatură vânt", "Ap",
         )}
-        self._add_pair(weather_frame, 0, "Actualizat (UTC)", self.updated)
-        self._add_pair(weather_frame, 1, "Sursă", self.source)
+        metadata = ttk.Frame(weather_frame)
+        metadata.grid(row=0, column=0, columnspan=4, sticky="ew", pady=(0, 8))
+        ttk.Label(metadata, text="Actualizat:").pack(side="left")
+        ttk.Label(metadata, textvariable=self.updated).pack(side="left", padx=(4, 18))
+        ttk.Label(metadata, text="Sursă:").pack(side="left")
+        ttk.Label(metadata, textvariable=self.source).pack(side="left", padx=4)
         metric_names = list(self._metric_values)
         for index, name in enumerate(metric_names):
-            row, column = divmod(index, 2)
-            frame = ttk.Frame(weather_frame)
-            frame.grid(row=row + 2, column=column, sticky="ew", padx=(0, 18), pady=1)
-            ttk.Label(frame, text=f"{name}:", width=20).pack(side="left")
-            ttk.Label(frame, textvariable=self._metric_values[name]).pack(side="left")
-        weather_frame.columnconfigure(0, weight=1)
-        weather_frame.columnconfigure(1, weight=1)
+            row, column = divmod(index, 4)
+            frame = ttk.Frame(weather_frame, style="Card.TFrame", padding=8)
+            frame.grid(row=row + 1, column=column, sticky="nsew", padx=3, pady=3)
+            ttk.Label(frame, text=name, style="CardMuted.TLabel").pack(anchor="w")
+            ttk.Label(frame, textvariable=self._metric_values[name], style="Card.TLabel", wraplength=210).pack(anchor="w", pady=(3, 0))
+        for column in range(4):
+            weather_frame.columnconfigure(column, weight=1)
 
         hf_frame = ttk.LabelFrame(self, text="HF Conditions", padding=6)
         hf_frame.pack(fill="x", pady=4)
         self.conditions = ttk.Frame(hf_frame)
         self.conditions.pack(fill="x")
-        for column, heading in enumerate(("Bandă", "Zi", "Noapte")):
+        for column, heading in enumerate(("Bandă", "Zi", "Noapte", "Scor", "Încredere")):
             ttk.Label(self.conditions, text=heading).grid(row=0, column=column, sticky="w", padx=(0, 22))
-        self._condition_values: dict[str, tuple[tk.StringVar, tk.StringVar]] = {}
+        self._condition_values: dict[str, tuple[tk.StringVar, tk.StringVar, tk.StringVar, tk.StringVar]] = {}
         self._condition_labels: dict[str, tuple[tk.Label, tk.Label]] = {}
         for row, band in enumerate(("80m", "40m", "20m", "15m", "10m"), start=1):
             ttk.Label(self.conditions, text=band).grid(row=row, column=0, sticky="w", padx=(0, 22))
-            day, night = tk.StringVar(value="—"), tk.StringVar(value="—")
+            day, night, score, confidence = tk.StringVar(value="—"), tk.StringVar(value="—"), tk.StringVar(value="—"), tk.StringVar(value="—")
             day_label = tk.Label(self.conditions, textvariable=day, anchor="w")
             night_label = tk.Label(self.conditions, textvariable=night, anchor="w")
             day_label.grid(row=row, column=1, sticky="w", padx=(0, 22))
             night_label.grid(row=row, column=2, sticky="w")
-            self._condition_values[band] = (day, night)
+            ttk.Label(self.conditions, textvariable=score).grid(row=row, column=3, sticky="w", padx=(0, 22))
+            ttk.Label(self.conditions, textvariable=confidence).grid(row=row, column=4, sticky="w")
+            self._condition_values[band] = (day, night, score, confidence)
             self._condition_labels[band] = (day_label, night_label)
 
         geomagnetic = ttk.LabelFrame(self, text="Geomagnetic", padding=6)
@@ -160,10 +166,12 @@ class PropagationPanel(ttk.LabelFrame):
             f"Solar Wind: {self._format_value(weather.solar_wind_speed)} km/s"
         )
         for band, (day, night) in self._estimator.calculate_hf(weather, datetime.now(timezone.utc)).items():
-            day_value, night_value = self._condition_values[band]
+            day_value, night_value, score_value, confidence_value = self._condition_values[band]
             day_label, night_label = self._condition_labels[band]
             day_value.set(day.rating)
             night_value.set(night.rating)
+            score_value.set(f"{(day.score + night.score) / 2:.0f}/100")
+            confidence_value.set(day.confidence.capitalize())
             day_label.config(fg=self._RATING_COLORS.get(day.rating, ""))
             night_label.config(fg=self._RATING_COLORS.get(night.rating, ""))
 
