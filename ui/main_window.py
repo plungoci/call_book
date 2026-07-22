@@ -85,7 +85,7 @@ class MainWindow(tk.Tk):
         window = tk.Toplevel(self); window.title("Setări condiții propagare"); window.transient(self)
         enabled = tk.BooleanVar(value=self.app_config.get("propagation_auto_refresh_minutes", "15") in PROPAGATION_REFRESH_INTERVALS)
         interval = tk.StringVar(value=self.app_config.get("propagation_auto_refresh_minutes", "15"))
-        ttk.Label(window, text="Datele meteo spațiale sunt descărcate de pe internet. Panoul afișează estimarea locală bazată pe datele NOAA SWPC.", wraplength=480, justify="left").pack(padx=12, pady=(12,6))
+        ttk.Label(window, text="Datele meteo spațiale sunt descărcate de pe internet din surse instituționale. Panoul afișează o estimare locală orientativă, nu o predicție garantată.", wraplength=480, justify="left").pack(padx=12, pady=(12,6))
         ttk.Checkbutton(window, text="Actualizare automată condiții", variable=enabled).pack(anchor="w", padx=12)
         row=ttk.Frame(window);row.pack(fill="x",padx=12,pady=6);ttk.Label(row,text="Interval:").pack(side="left");ttk.Combobox(row,textvariable=interval,values=("10","15","30","60"),state="readonly",width=8).pack(side="left");ttk.Label(row,text="minute").pack(side="left")
         def save_settings() -> None:

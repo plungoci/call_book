@@ -11,7 +11,7 @@ from propagation_models import SpaceWeatherData
 from services.propagation_cache import PropagationCache
 from services.propagation_estimator import PropagationEstimator, evaluate_band_conditions
 from services.band_detector import BandDetector
-from services.space_weather_service import SpaceWeatherError, SpaceWeatherService
+from services.space_weather_service import SpaceWeatherError, SpaceWeatherService, parse_gfz_nowcast, parse_silso_daily_csv
 from ui.propagation_panel import PropagationPanel
 
 
@@ -49,7 +49,11 @@ class PropagationEstimatorTests(TestCase):
         self.assertIn("Sporadic", " ".join(condition.warnings))
 
     def test_unavailable_values_are_displayed_clearly(self) -> None:
-        self.assertEqual(PropagationPanel._format_value(None), "Unavailable")
+        self.assertEqual(PropagationPanel._format_value(None), "N/A")
+
+    def test_institutional_text_parsers_use_latest_valid_values(self) -> None:
+        self.assertEqual(parse_silso_daily_csv("# header\n2025; 1; 1; 2025.0; 99; 2; 1\n"), 99)
+        self.assertEqual(parse_gfz_nowcast("# header\n2025 01 01 00 2.3 12\n"), (2.3, 12))
 
     def test_band_detector_covers_requested_hf_vhf_and_uhf_bands(self) -> None:
         cases = (

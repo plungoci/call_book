@@ -51,7 +51,10 @@ def evaluate_band_conditions(
         "Foarte slabă" if score < 20 else "Slabă" if score < 40 else "Moderată"
         if score < 60 else "Bună" if score < 80 else "Foarte bună"
     )
-    return BandCondition(rating, score, f"Estimare simplificată: {rating.lower()} ({score:.0f}/100).", tuple(warnings))
+    available = sum(value is not None for value in (space_weather.solar_flux, space_weather.kp_index, space_weather.a_index))
+    confidence = "medie" if available == 3 else "scăzută"
+    warnings.append("Estimare orientativă, nu predicție garantată.")
+    return BandCondition(rating, score, f"Estimare simplificată: {rating.lower()} ({score:.0f}/100).", tuple(warnings), confidence)
 
 
 class PropagationEstimator:
