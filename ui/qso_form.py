@@ -6,8 +6,11 @@ from models import QSO
 from validators import band_for_frequency, format_name_input, normalize_callsign
 from services.band_detector import BandDetector
 from services.propagation_service import PROPAGATION_UNKNOWN
+from propagation import PROPAGATION_MODES
 from .tooltip import Tooltip
-MODES=("FM","AM","SSB","USB","LSB","CW","RTTY","FT8","FT4","PSK31","DIGITAL","MSK144","EchoLink","AllStar","DMR","D-STAR","C4FM","Internet Gateway"); QSL=("NOT_SENT","SENT","RECEIVED","CONFIRMED")
+MODES=("FM","AM","SSB","USB","LSB","CW","RTTY","FT8","FT4","PSK31","DIGITAL","MSK144","EchoLink","AllStar","DMR","D-STAR","C4FM","Internet Gateway")
+QSL=("NOT_SENT","SENT","RECEIVED","CONFIRMED")
+FORM_FIELDS=(("Indicativ","callsign"),("Nume","operator_name"),("Repetor","repeater"),("Frecvență MHz","frequency_mhz"),("Bandă","band"),("Mod","mode"),("RST trimis","rst_sent"),("RST primit","rst_received"),("Locator","grid_square"),("Putere W","power_w"),("QSL","qsl_status"),("Început UTC","qso_start_utc"),("Sfârșit UTC","qso_end_utc"),("Propagare","propagation_mode"),("Satelit","satellite_name"),("Mod uplink","uplink_mode"),("Mod downlink","downlink_mode"),("Distanță km","distance_km"),("Azimut °","azimuth_deg"))
 class QSOForm(ttk.LabelFrame):
  def __init__(self,parent,repeaters,on_save,default_power_w=None,band_callback=None):
   super().__init__(parent,text="QSO (toate orele sunt UTC)",padding=8);self.repeaters=repeaters;self.on_save=on_save;self.default_power_w=default_power_w;self.band_callback=band_callback;self.qso_id=None;self.vars={k:tk.StringVar() for k in ("callsign","operator_name","repeater","frequency_mhz","band","mode","rst_sent","rst_received","grid_square","power_w","qsl_status","qso_start_utc","qso_end_utc","propagation_mode","satellite_name","uplink_mode","downlink_mode","distance_km","azimuth_deg")};self._formatting=False;self._updating_band=False;self._suppress_context_updates=False;self.propagation_notes_value="";self._build();self._bind_formatters();self.new()
@@ -27,17 +30,23 @@ class QSOForm(ttk.LabelFrame):
    "qso_start_utc":"Data și ora de început a QSO-ului, în UTC.",
    "qso_end_utc":"Data și ora de sfârșit a QSO-ului, în UTC.",
   }
-  labels=[("Indicativ","callsign"),("Nume","operator_name"),("Repetor","repeater"),("Frecvență MHz","frequency_mhz"),("Bandă","band"),("Mod","mode"),("RST trimis","rst_sent"),("RST primit","rst_received"),("Locator","grid_square"),("Putere W","power_w"),("QSL","qsl_status"),("Început UTC","qso_start_utc"),("Sfârșit UTC","qso_end_utc")]
+  labels=FORM_FIELDS
   self.frequency_notice=tk.StringVar(value="")
   for i,(label,key) in enumerate(labels):
    ttk.Label(self,text=label).grid(row=i//2*2,column=i%2*2,sticky="w",padx=3)
-   widget=ttk.Combobox(self,textvariable=self.vars[key],state="readonly" if key in ("repeater","mode","qsl_status") else "normal",width=28) if key in ("repeater","mode","qsl_status") else ttk.Entry(self,textvariable=self.vars[key],width=30)
+   choices=("repeater","mode","qsl_status","propagation_mode")
+   widget=ttk.Combobox(self,textvariable=self.vars[key],state="readonly" if key in choices else "normal",width=28) if key in choices else ttk.Entry(self,textvariable=self.vars[key],width=30)
    if key=="mode":widget["values"]=MODES
    elif key=="qsl_status":widget["values"]=QSL
+   elif key=="propagation_mode":widget["values"]=PROPAGATION_MODES
    elif key=="repeater":widget["values"]=["" ]+[f"{r['id']} — {r['name']}" for r in self.repeaters()];widget.bind("<<ComboboxSelected>>",self._repeater)
-   widget.grid(row=i//2*2+1,column=i%2*2,sticky="ew",padx=3);setattr(self,key+"_widget",widget);Tooltip(widget,descriptions[key])
+   widget.grid(row=i//2*2+1,column=i%2*2,sticky="ew",padx=3);setattr(self,key+"_widget",widget);Tooltip(widget,descriptions.get(key, f"Valoarea {label.lower()} pentru acest QSO."))
    if key=="frequency_mhz": ttk.Label(self,textvariable=self.frequency_notice,foreground="#a16207").grid(row=i//2*2+2,column=i%2*2,sticky="w",padx=3)
-  ttk.Label(self,text="Observații").grid(row=14,column=0,sticky="w");self.notes=tk.Text(self,width=65,height=3);self.notes.grid(row=15,column=0,columnspan=4,sticky="ew",padx=3);Tooltip(self.notes,"Informații suplimentare despre QSO.")
+  notes_row=((len(labels)+1)//2)*2
+  ttk.Label(self,text="Observații").grid(row=notes_row,column=0,sticky="w")
+  notes_frame=ttk.Frame(self);notes_frame.grid(row=notes_row+1,column=0,columnspan=4,sticky="ew",padx=3)
+  self.notes=tk.Text(notes_frame,width=65,height=3,wrap="word");notes_scroll=ttk.Scrollbar(notes_frame,orient="vertical",command=self.notes.yview);self.notes.configure(yscrollcommand=notes_scroll.set);self.notes.pack(side="left",fill="both",expand=True);notes_scroll.pack(side="right",fill="y");Tooltip(self.notes,"Informații suplimentare despre QSO.")
+  for column in range(4):self.columnconfigure(column,weight=1)
  def _bind_formatters(self):
   """Format callsign and name immediately, retaining the insertion point."""
   self.vars["callsign"].trace_add("write",lambda *_:self._format_var("callsign",self.callsign_widget,normalize_callsign))

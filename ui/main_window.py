@@ -7,17 +7,17 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from adif_export import export_adif
-from backup import create_backup
+from application_controller import DuplicateQsoCancelled, LogbookController
+from config import PROPAGATION_REFRESH_INTERVALS, save_config
 from database import Database
 from excel_export import export_excel
 from models import QSO
-from validators import validate_qso
 from .operator_profile_window import OperatorProfileWindow
 from .qso_form import QSOForm
 from .repeater_window import RepeaterWindow
 from .tooltip import Tooltip
 from .propagation_panel import PropagationPanel
+from .common_widgets import attach_tree_scrollbars
 
 
 class MainWindow(tk.Tk):
@@ -26,6 +26,7 @@ class MainWindow(tk.Tk):
     def __init__(self, db: Database, config: dict[str, str]) -> None:
         super().__init__()
         self.db, self.app_config = db, config
+        self.controller = LogbookController(db)
         self.operator_profile = self.db.get_operator_profile()
         self.search_panel_visible = False
         self.operator_profile_window: OperatorProfileWindow | None = None
@@ -82,13 +83,14 @@ class MainWindow(tk.Tk):
 
     def open_propagation_settings(self) -> None:
         window = tk.Toplevel(self); window.title("Setări condiții propagare"); window.transient(self)
-        enabled = tk.BooleanVar(value=self.app_config.get("propagation_auto_refresh_minutes", "15") in {"10", "15", "30", "60"})
+        enabled = tk.BooleanVar(value=self.app_config.get("propagation_auto_refresh_minutes", "15") in PROPAGATION_REFRESH_INTERVALS)
         interval = tk.StringVar(value=self.app_config.get("propagation_auto_refresh_minutes", "15"))
         ttk.Label(window, text="Datele meteo spațiale sunt descărcate de pe internet. Panoul afișează estimarea locală bazată pe datele NOAA SWPC.", wraplength=480, justify="left").pack(padx=12, pady=(12,6))
         ttk.Checkbutton(window, text="Actualizare automată condiții", variable=enabled).pack(anchor="w", padx=12)
         row=ttk.Frame(window);row.pack(fill="x",padx=12,pady=6);ttk.Label(row,text="Interval:").pack(side="left");ttk.Combobox(row,textvariable=interval,values=("10","15","30","60"),state="readonly",width=8).pack(side="left");ttk.Label(row,text="minute").pack(side="left")
         def save_settings() -> None:
             self.app_config["propagation_auto_refresh_minutes"] = interval.get() if enabled.get() else "0"
+            save_config(self.app_config)
             if self._propagation_auto_after_id:
                 try: self.after_cancel(self._propagation_auto_after_id)
                 except tk.TclError: pass
@@ -107,6 +109,7 @@ class MainWindow(tk.Tk):
     def toggle_propagation_panel(self) -> None:
         visible = self.show_propagation_panel_var.get()
         self.app_config["show_propagation_panel"] = "true" if visible else "false"
+        save_config(self.app_config)
         if visible:
             if "tree" in self.__dict__: self.propagation_panel.pack(fill="both", expand=False, padx=8, pady=(4,0), before=self.tree)
             else: self.propagation_panel.pack(fill="both", expand=False, padx=8, pady=(4,0))
@@ -116,7 +119,7 @@ class MainWindow(tk.Tk):
     def _schedule_propagation_auto_refresh(self) -> None:
         try: minutes=int(self.app_config.get("propagation_auto_refresh_minutes", "15"))
         except ValueError: minutes=15
-        if minutes not in (10,15,30,60): return
+        if str(minutes) not in PROPAGATION_REFRESH_INTERVALS: return
         self._propagation_auto_after_id=self.after(minutes*60*1000, self._automatic_propagation_refresh)
 
     def _automatic_propagation_refresh(self) -> None:
@@ -202,7 +205,9 @@ class MainWindow(tk.Tk):
         self.tree = ttk.Treeview(self, columns=columns, show="headings")
         for column in columns:
             self.tree.heading(column, text=column.upper())
-        self.tree.pack(fill="both", expand=True, padx=8, pady=8)
+            self.tree.column(column, width=105, minwidth=70, stretch=True)
+        self.table_container = attach_tree_scrollbars(self, self.tree)
+        self.table_container.pack(fill="both", expand=True, padx=8, pady=8)
         self.tree.bind("<<TreeviewSelect>>", self.selection_changed)
         Tooltip(self.tree, "Lista QSO-urilor salvate. Selectează un rând pentru editare sau ștergere.")
 
@@ -237,20 +242,16 @@ class MainWindow(tk.Tk):
 
     def save(self) -> None:
         try:
-            qso = self.form.value()
-            if qso.id is None:
-                # Snapshot the operator's locator for historical ADIF accuracy.
-                qso.my_grid_square = self.db.get_operator_profile().grid_square
-            qso.qso_end_utc = qso.qso_end_utc or datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-            validate_qso(qso)
-            if self.db.possible_duplicate(qso) and not messagebox.askyesno("Posibil duplicat", "Există un QSO similar în ±2 minute. Salvați totuși?"):
-                return
-            editing = qso.id is not None
-            self.db.save_qso(qso)
+            _, editing = self.controller.save_qso(
+                self.form.value(),
+                lambda _: messagebox.askyesno("Posibil duplicat", "Există un QSO similar în ±2 minute. Salvați totuși?"),
+            )
             self.refresh()
             self.cancel_edit()
             messagebox.showinfo("Succes", "QSO actualizat." if editing else "QSO salvat.")
-        except Exception as exc:
+        except DuplicateQsoCancelled:
+            return
+        except (ValueError, OSError, KeyError) as exc:
             logging.exception("QSO save error")
             messagebox.showerror("Eroare", str(exc))
 
@@ -272,7 +273,7 @@ class MainWindow(tk.Tk):
         self.refresh()
 
     def selected_qsos(self) -> list[QSO]:
-        return [QSO(**{key: row[key] for key in QSO.__dataclass_fields__ if key in row.keys()}) for row in self.db.list_qsos(self.filters())]
+        return self.controller.list_qsos(self.filters())
 
     def open_operator_profile(self) -> None:
         if self._raise_window(self.operator_profile_window):
@@ -294,10 +295,10 @@ class MainWindow(tk.Tk):
         return False
 
     def adif(self) -> None:
-        self._export("ADIF", ".adi", [("ADIF", "*.adi")], lambda qsos, destination: export_adif(qsos, destination=destination, profile=self.db.get_operator_profile()))
+        self._export("ADIF", ".adi", [("ADIF", "*.adi")], self.controller.export_adif)
 
     def excel(self) -> None:
-        self._export("Excel", ".xlsx", [("Excel", "*.xlsx")], export_excel)
+        self._export("Excel", ".xlsx", [("Excel", "*.xlsx")], self.controller.export_excel)
 
     def _export(self, title: str, extension: str, filetypes: list[tuple[str, str]], exporter: object) -> None:
         try:
@@ -311,7 +312,7 @@ class MainWindow(tk.Tk):
 
     def backup(self) -> None:
         try:
-            messagebox.showinfo("Backup", f"Backup creat: {create_backup(self.db.path)}")
+            messagebox.showinfo("Backup", f"Backup creat: {self.controller.create_backup()}")
         except Exception as exc:
             logging.exception("Backup")
             messagebox.showerror("Eroare backup", str(exc))
