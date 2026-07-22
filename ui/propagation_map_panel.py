@@ -6,11 +6,11 @@ import tkinter as tk
 from tkinter import ttk
 from propagation_models import PropagationMapRequest
 from services.propagation_map_service import PropagationMapService
-from services.space_weather_service import SpaceWeatherService
+from services.space_weather_service import InternetConnectionError, SpaceWeatherService
 from .tooltip import Tooltip
 class PropagationMapPanel(ttk.LabelFrame):
  def __init__(self,parent, profile_getter, on_expand=None):
-  super().__init__(parent,text="Hartă propagare",padding=6);self.profile_getter=profile_getter;self.on_expand=on_expand;self.executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix="propagation");self.request_id=0;self.after_id=None;self.closing=False;self.propagation_photo=None
+  super().__init__(parent,text="Hartă propagare",padding=6);self.profile_getter=profile_getter;self.on_expand=on_expand;self.executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix="propagation");self.request_id=0;self.after_id=None;self.closing=False;self.propagation_photo=None;self.internet_unavailable=False
   self.status=tk.StringVar(value="Selectează o bandă pentru afișarea estimării de propagare.");self.details=tk.StringVar(value="Estimare de propagare — fără date încărcate")
   top=ttk.Frame(self);top.pack(fill="x");ttk.Label(top,textvariable=self.status).pack(side="left");self.refresh_button=ttk.Button(top,text="Actualizează",command=lambda:self.schedule(self.band, self.frequency,0));self.refresh_button.pack(side="right");Tooltip(self.refresh_button,"Descarcă cele mai recente date disponibile și regenerează harta pentru banda selectată.")
   if on_expand: ttk.Button(top,text="Mărește",command=on_expand).pack(side="right",padx=4)
@@ -19,10 +19,16 @@ class PropagationMapPanel(ttk.LabelFrame):
   self.band="";self.frequency=None
  def schedule(self,band,frequency=None,delay=700):
   self.band=(band or "").strip();self.frequency=frequency
+  if delay == 0:
+   # A deliberate click is allowed to retry after the user restores Wi-Fi.
+   self.internet_unavailable=False
   if self.after_id:
    try:self.after_cancel(self.after_id)
    except tk.TclError:pass
   if not self.band:self.status.set("Selectează o bandă pentru afișarea estimării de propagare.");return
+  if self.internet_unavailable:
+   self.status.set("Nu există conexiune la internet. Conectați dispozitivul la Wi-Fi, apoi apăsați Actualizează.")
+   return
   self.request_id+=1; rid=self.request_id;self.after_id=self.after(delay,lambda:self._start(rid))
  def _start(self,rid):
   if self.closing or rid!=self.request_id:return
@@ -43,8 +49,13 @@ class PropagationMapPanel(ttk.LabelFrame):
    self.status.set("Date din cache" if result.is_cached else "Actualizat")
    self.details.set(f"Bandă: {result.band}; frecvență: {self.frequency or 'Indisponibil'} MHz; UTC: {result.generated_at_utc:%Y-%m-%d %H:%M}; sursă: {result.source_description}; SFI/F10.7: {val(weather.solar_flux)}; Kp: {val(weather.kp_index)}; A-index: {val(weather.a_index)}; pete: {val(weather.sunspot_number)}; blackout: {val(weather.radio_blackout_level)}. " + " ".join(result.warnings))
   except Exception as exc:
-   self.status.set("Internet indisponibil" if self.propagation_photo else "Harta propagării nu este disponibilă. Verifică legătura la internet și încearcă din nou.")
-   self.details.set(f"Eroare de actualizare: {type(exc).__name__}. Harta existentă este păstrată.")
+   if isinstance(exc, InternetConnectionError):
+    self.internet_unavailable=True
+    self.status.set("Nu există conexiune la internet. Conectați dispozitivul la Wi-Fi pentru actualizarea propagării.")
+    self.details.set("Actualizarea automată este suspendată până apăsați Actualizează. Harta existentă este păstrată.")
+   else:
+    self.status.set("Actualizarea propagării a eșuat. Verifică legătura la internet și încearcă din nou.")
+    self.details.set(f"Eroare de actualizare: {type(exc).__name__}: {exc}. Harta existentă este păstrată.")
  def shutdown(self):
   self.closing=True
   if self.after_id:
