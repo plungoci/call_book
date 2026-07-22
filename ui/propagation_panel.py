@@ -57,10 +57,10 @@ class PropagationPanel(ttk.LabelFrame):
         metric_names = list(self._metric_values)
         for index, name in enumerate(metric_names):
             row, column = divmod(index, 4)
-            frame = ttk.Frame(weather_frame, style="Card.TFrame", padding=8)
+            frame = ttk.Frame(weather_frame, padding=8)
             frame.grid(row=row + 1, column=column, sticky="nsew", padx=3, pady=3)
-            ttk.Label(frame, text=name, style="CardMuted.TLabel").pack(anchor="w")
-            ttk.Label(frame, textvariable=self._metric_values[name], style="Card.TLabel", wraplength=210).pack(anchor="w", pady=(3, 0))
+            ttk.Label(frame, text=name).pack(anchor="w")
+            ttk.Label(frame, textvariable=self._metric_values[name], wraplength=210).pack(anchor="w", pady=(3, 0))
         for column in range(4):
             weather_frame.columnconfigure(column, weight=1)
 
