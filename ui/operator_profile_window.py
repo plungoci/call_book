@@ -57,8 +57,8 @@ class OperatorProfileWindow(tk.Toplevel):
         threading.Thread(target=self._detect_worker,daemon=True).start()
     def _detect_worker(self) -> None:
         try: result=LocationService().locate()
-        except Exception as exc: self.after(0,lambda:self._location_error(exc)); return
-        self.after(0,lambda:self._apply_location(result))
+        except Exception as exc: self.after(0,lambda error=exc:self._location_error(error)); return
+        self.after(0,lambda location=result:self._apply_location(location))
     def _finish_detection(self) -> None:
         self.detect_button.config(state="normal",text="Detectează locația"); self.config(cursor="")
     def _apply_location(self,result) -> None:
