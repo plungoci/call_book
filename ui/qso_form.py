@@ -5,11 +5,13 @@ from tkinter import ttk
 from models import QSO
 from validators import band_for_frequency, format_name_input, normalize_callsign
 from propagation import PROPAGATION_MODES, QO100_PROPAGATION, SATELLITE_PROPAGATION
+from services.propagation_service import (PROPAGATION_SATELLITE, PROPAGATION_UNKNOWN,
+ PropagationSuggestionState, suggest_propagation_mode)
 from .tooltip import Tooltip
-MODES=("FM","AM","SSB","USB","LSB","CW","RTTY","FT8","FT4","PSK31","DIGITAL"); QSL=("NOT_SENT","SENT","RECEIVED","CONFIRMED")
+MODES=("FM","AM","SSB","USB","LSB","CW","RTTY","FT8","FT4","PSK31","DIGITAL","MSK144","EchoLink","AllStar","DMR","D-STAR","C4FM","Internet Gateway"); QSL=("NOT_SENT","SENT","RECEIVED","CONFIRMED")
 class QSOForm(ttk.LabelFrame):
  def __init__(self,parent,repeaters,on_save,default_power_w=None):
-  super().__init__(parent,text="QSO (toate orele sunt UTC)",padding=8);self.repeaters=repeaters;self.on_save=on_save;self.default_power_w=default_power_w;self.qso_id=None;self.vars={k:tk.StringVar() for k in ("callsign","operator_name","repeater","frequency_mhz","band","mode","rst_sent","rst_received","grid_square","power_w","qsl_status","qso_start_utc","qso_end_utc","propagation_mode","satellite_name","uplink_mode","downlink_mode","distance_km","azimuth_deg")};self._formatting=False;self._build();self._bind_formatters();self.new()
+  super().__init__(parent,text="QSO (toate orele sunt UTC)",padding=8);self.repeaters=repeaters;self.on_save=on_save;self.default_power_w=default_power_w;self.qso_id=None;self.vars={k:tk.StringVar() for k in ("callsign","operator_name","repeater","frequency_mhz","band","mode","rst_sent","rst_received","grid_square","power_w","qsl_status","qso_start_utc","qso_end_utc","propagation_mode","satellite_name","uplink_mode","downlink_mode","distance_km","azimuth_deg")};self._formatting=False;self._updating_propagation=False;self._updating_band=False;self._suppress_context_updates=False;self.propagation_state=PropagationSuggestionState();self._build();self._bind_formatters();self.new()
  def _build(self):
   descriptions={
    "callsign":"Indicativul stației cu care ai realizat legătura.\nExemplu: YO8ABC",
@@ -37,7 +39,9 @@ class QSOForm(ttk.LabelFrame):
   ttk.Label(self,text="Observații").grid(row=14,column=0,sticky="w");self.notes=tk.Text(self,width=65,height=3);self.notes.grid(row=15,column=0,columnspan=4,sticky="ew",padx=3);Tooltip(self.notes,"Informații suplimentare despre QSO.")
   self.propagation_frame=ttk.LabelFrame(self,text="Propagare",padding=6);self.propagation_frame.grid(row=16,column=0,columnspan=4,sticky="ew",pady=(8,0));self.propagation_frame.columnconfigure(1,weight=1)
   ttk.Label(self.propagation_frame,text="Tip propagare").grid(row=0,column=0,sticky="w")
-  self.propagation_mode_widget=ttk.Combobox(self.propagation_frame,textvariable=self.vars["propagation_mode"],values=PROPAGATION_MODES,state="readonly",width=28);self.propagation_mode_widget.grid(row=0,column=1,sticky="ew",padx=3);self.propagation_mode_widget.bind("<<ComboboxSelected>>",self._propagation_changed);Tooltip(self.propagation_mode_widget,"Specifică modul în care semnalul a ajuns la corespondent.")
+  self.propagation_mode_widget=ttk.Combobox(self.propagation_frame,textvariable=self.vars["propagation_mode"],values=PROPAGATION_MODES,state="readonly",width=28);self.propagation_mode_widget.grid(row=0,column=1,sticky="ew",padx=3);self.propagation_mode_widget.bind("<<ComboboxSelected>>",self._propagation_changed);Tooltip(self.propagation_mode_widget,"Valoare sugerată automat în funcție de bandă. Poate fi modificată manual.")
+  self.recalculate_propagation_button=ttk.Button(self.propagation_frame,text="Recalculează propagarea",command=lambda:self.update_propagation_suggestion(force=True));self.recalculate_propagation_button.grid(row=0,column=2,padx=(3,0));Tooltip(self.recalculate_propagation_button,"Recalculează sugestia de propagare pe baza benzii, modului, repetorului și satelitului selectat.")
+  self.propagation_hint=tk.StringVar(value="Sugestie automată");ttk.Label(self.propagation_frame,textvariable=self.propagation_hint).grid(row=1,column=2,sticky="n",padx=3)
   self.satellite_fields=ttk.Frame(self.propagation_frame);self.satellite_fields.grid(row=1,column=0,columnspan=2,sticky="ew");self.satellite_fields.columnconfigure(1,weight=1)
   for row,label,key,tip in ((0,"Nume satelit","satellite_name","Numele satelitului utilizat pentru comunicație.\nExemplu: QO-100."),(1,"Mod uplink","uplink_mode","Modul utilizat pentru transmisia către satelit."),(2,"Mod downlink","downlink_mode","Modul utilizat pentru recepția de la satelit.")):
    ttk.Label(self.satellite_fields,text=label).grid(row=row,column=0,sticky="w");widget=ttk.Entry(self.satellite_fields,textvariable=self.vars[key],width=30);widget.grid(row=row,column=1,sticky="ew",padx=3);Tooltip(widget,tip)
@@ -48,6 +52,10 @@ class QSOForm(ttk.LabelFrame):
   """Format callsign and name immediately, retaining the insertion point."""
   self.vars["callsign"].trace_add("write",lambda *_:self._format_var("callsign",self.callsign_widget,normalize_callsign))
   self.vars["operator_name"].trace_add("write",lambda *_:self._format_var("operator_name",self.operator_name_widget,format_name_input))
+  self.vars["frequency_mhz"].trace_add("write",lambda *_:self._frequency_changed())
+  self.vars["band"].trace_add("write",lambda *_:self.update_propagation_suggestion())
+  self.vars["mode"].trace_add("write",lambda *_:self.update_propagation_suggestion())
+  self.vars["satellite_name"].trace_add("write",lambda *_:self.update_propagation_suggestion())
  def _format_var(self,key,widget,formatter):
   if self._formatting:return
   value=self.vars[key].get();formatted=formatter(value)
@@ -76,21 +84,59 @@ class QSOForm(ttk.LabelFrame):
  def _repeater(self,_):
   text=self.vars["repeater"].get()
   if not text:return
-  r=next(r for r in self.repeaters() if str(r["id"])==text.split(" ")[0]);self.vars["frequency_mhz"].set(r["output_frequency_mhz"]);self.vars["mode"].set(r["mode"] or "FM");self.vars["band"].set(band_for_frequency(r["output_frequency_mhz"]))
+  r=next(r for r in self.repeaters() if str(r["id"])==text.split(" ")[0]);self.vars["frequency_mhz"].set(r["output_frequency_mhz"]);self.vars["mode"].set(r["mode"] or "FM");self.vars["band"].set(band_for_frequency(r["output_frequency_mhz"]));self.update_propagation_suggestion(force=True)
+ def _frequency_changed(self):
+  """Detect the existing band from a valid frequency, then refresh its suggestion."""
+  if self._suppress_context_updates or self._updating_band:return
+  try: band=band_for_frequency(float(self.vars["frequency_mhz"].get()))
+  except ValueError: self.update_propagation_suggestion();return
+  if band != "Unknown":
+   self._updating_band=True
+   try:self.vars["band"].set(band)
+   finally:self._updating_band=False
+  self.update_propagation_suggestion()
+ def update_propagation_suggestion(self,force:bool=False)->None:
+  """Apply a default only when it does not replace a protected manual choice."""
+  if self._suppress_context_updates or self._updating_propagation:return
+  v=self.vars
+  try: frequency=float(v["frequency_mhz"].get()) if v["frequency_mhz"].get().strip() else None
+  except ValueError: frequency=None
+  repeater_selected=bool(v["repeater"].get().strip())
+  satellite_selected=v["propagation_mode"].get() in (SATELLITE_PROPAGATION,QO100_PROPAGATION)
+  suggestion=suggest_propagation_mode(v["band"].get(),frequency,v["mode"].get(),repeater_selected,satellite_selected)
+  if not self.propagation_state.may_apply(suggestion,force):return
+  self._updating_propagation=True
+  try:
+   v["propagation_mode"].set(suggestion)
+   self.propagation_state.mark_automatic();self.propagation_hint.set("Sugestie automată")
+   if suggestion == PROPAGATION_SATELLITE:self.satellite_fields.grid()
+   else:self.satellite_fields.grid_remove()
+  finally:self._updating_propagation=False
  def _propagation_changed(self,_=None):
+  """Record a user's choice and retain QO-100's convenient satellite preset."""
+  if self._updating_propagation:return
   mode=self.vars["propagation_mode"].get()
   if mode == QO100_PROPAGATION:
-   self.vars["propagation_mode"].set(SATELLITE_PROPAGATION);self.vars["satellite_name"].set("QO-100");mode=SATELLITE_PROPAGATION
+   self.vars["propagation_mode"].set(SATELLITE_PROPAGATION)
+   if not self.vars["satellite_name"].get().strip():self.vars["satellite_name"].set("QO-100")
+   mode=SATELLITE_PROPAGATION
+  self.propagation_state.mark_manual();self.propagation_hint.set("Valoare manuală")
   if mode == SATELLITE_PROPAGATION:self.satellite_fields.grid()
   else:self.satellite_fields.grid_remove()
  def new(self):
-  self.qso_id=None
-  for var in self.vars.values():var.set("")
-  self.vars["qso_start_utc"].set(datetime.now(timezone.utc).replace(microsecond=0).isoformat());self.vars["mode"].set("FM");self.vars["qsl_status"].set("NOT_SENT");self.vars["propagation_mode"].set("Necunoscută");self.vars["power_w"].set("" if self.default_power_w is None else f"{self.default_power_w:g}");self.notes.delete("1.0","end");self.propagation_notes.delete("1.0","end");self._propagation_changed();self.callsign_widget.focus_set()
+  self.qso_id=None;self._suppress_context_updates=True
+  try:
+   for var in self.vars.values():var.set("")
+   self.vars["qso_start_utc"].set(datetime.now(timezone.utc).replace(microsecond=0).isoformat());self.vars["mode"].set("FM");self.vars["qsl_status"].set("NOT_SENT");self.vars["propagation_mode"].set(PROPAGATION_UNKNOWN);self.vars["power_w"].set("" if self.default_power_w is None else f"{self.default_power_w:g}")
+  finally:self._suppress_context_updates=False
+  self.propagation_state.reset_for_new_qso();self.propagation_hint.set("Sugestie automată");self.notes.delete("1.0","end");self.propagation_notes.delete("1.0","end");self._propagation_changed();self.propagation_state.reset_for_new_qso();self.callsign_widget.focus_set()
  def load(self,q:QSO):
-  self.qso_id=q.id
-  for key in self.vars:
-   if hasattr(q,key):self.vars[key].set(str(getattr(q,key) or ""))
-  self.vars["repeater"].set(f"{q.repeater_id} —" if q.repeater_id else "");self.notes.delete("1.0","end");self.notes.insert("1.0",q.notes);self.propagation_notes.delete("1.0","end");self.propagation_notes.insert("1.0",q.propagation_notes);self._propagation_changed()
+  self.qso_id=q.id;self._suppress_context_updates=True
+  try:
+   for key in self.vars:
+    if hasattr(q,key):self.vars[key].set(str(getattr(q,key) or ""))
+   self.vars["repeater"].set(f"{q.repeater_id} —" if q.repeater_id else "")
+  finally:self._suppress_context_updates=False
+  self.notes.delete("1.0","end");self.notes.insert("1.0",q.notes);self.propagation_notes.delete("1.0","end");self.propagation_notes.insert("1.0",q.propagation_notes);self._propagation_changed();self.propagation_state.load_existing_qso();self.propagation_hint.set("Valoare manuală")
  def value(self)->QSO:
   v=self.vars; rep=v["repeater"].get().split(" ")[0];return QSO(id=self.qso_id,callsign=v["callsign"].get(),operator_name=v["operator_name"].get(),repeater_id=int(rep) if rep.isdigit() else None,frequency_mhz=float(v["frequency_mhz"].get()),band=v["band"].get(),mode=v["mode"].get(),rst_sent=v["rst_sent"].get(),rst_received=v["rst_received"].get(),grid_square=v["grid_square"].get(),power_w=float(v["power_w"].get()) if v["power_w"].get() else None,qsl_status=v["qsl_status"].get(),qso_start_utc=v["qso_start_utc"].get(),qso_end_utc=v["qso_end_utc"].get(),notes=self.notes.get("1.0","end-1c"),propagation_mode=v["propagation_mode"].get(),satellite_name=v["satellite_name"].get(),uplink_mode=v["uplink_mode"].get(),downlink_mode=v["downlink_mode"].get(),distance_km=float(v["distance_km"].get()) if v["distance_km"].get() else None,azimuth_deg=float(v["azimuth_deg"].get()) if v["azimuth_deg"].get() else None,propagation_notes=self.propagation_notes.get("1.0","end-1c"))

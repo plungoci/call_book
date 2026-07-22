@@ -76,7 +76,11 @@ Din **Fișier**, **Exportă Excel** creează implicit un fișier în `exports/`,
 
 ### Propagare
 
-Secțiunea **Propagare** a formularului este opțională și documentează traseul real al semnalului. Alege **Directă** pentru legături fără releu, **Repeater** pentru un repetor selectat deja în QSO, și **Satelit** pentru comunicații prin satelit. Lista include și modurile uzuale de propagare: **EME (Moonbounce)**, **Meteor Scatter**, **Troposcatter**, **Tropospheric Ducting**, **Sporadic-E**, **F2**, **Aurora/Aurora-E**, **NVIS**, **Backscatter**, **Aircraft/Rain Scatter** și **Ionoscatter**, precum și opțiuni pentru gateway-uri și moduri digitale. Selectează **Necunoscută** când traseul nu este cunoscut și **Altele** pentru un caz neacoperit de listă.
+Secțiunea **Propagare** a formularului este opțională și documentează traseul real al semnalului. După alegerea sau detectarea benzii din frecvență, aplicația completează **Tip propagare** cu o **sugestie implicită**: de exemplu, 20 m → **F2**, 40/80 m → **NVIS**, iar 2 m/70 cm → **Directă**. Aceasta nu detectează și nu confirmă condițiile ionosferice sau atmosferice reale; fenomene precum Sporadic-E, aurora, ducting sau rain scatter trebuie confirmate și, când este cazul, alese manual de operator.
+
+Sugestia poate fi modificată din listă, iar valoarea manuală este protejată la schimbările obișnuite ale frecvenței, benzii sau modului (inclusiv **EME (Moonbounce)**). Eticheta discretă indică **Sugestie automată** sau **Valoare manuală**. **Satelit** are cea mai mare prioritate, urmat de **Repeater** pentru un repetor selectat; modurile de rețea EchoLink, AllStar, DMR, D-STAR, C4FM și Internet Gateway sunt de asemenea păstrate. Pentru a ignora temporar valoarea manuală, apasă **Recalculează propagarea**: aplicația reaplică regulile după bandă, mod, repetor și satelit și marchează rezultatul automat. QSO-urile deja salvate și încărcate pentru editare își păstrează propagarea istorică până când schimbi contextul relevant sau folosești acest buton.
+
+Alege **Directă** pentru legături fără releu, **Repeater** pentru un repetor selectat deja în QSO, și **Satelit** pentru comunicații prin satelit. Lista include și modurile uzuale de propagare: **EME (Moonbounce)**, **Meteor Scatter**, **Troposcatter**, **Tropospheric Ducting**, **Sporadic-E**, **F2**, **Aurora/Aurora-E**, **NVIS**, **Backscatter**, **Aircraft/Rain Scatter** și **Ionoscatter**, precum și opțiuni pentru gateway-uri și moduri digitale. Selectează **Necunoscută** când traseul nu este cunoscut și **Altele** pentru un caz neacoperit de listă.
 
 Pentru **Satelit**, completează obligatoriu numele satelitului și modurile de lucru **uplink** și **downlink**; de exemplu, `QO-100`, `SSB`, `SSB`. Alegerea **QO-100** completează automat propagarea prin satelit și numele satelitului. **Distanță (km)** acceptă un număr pozitiv cu zecimale, iar **Azimut (°)** este opțional și trebuie să fie între 0 și 360. Observațiile de propagare pot păstra detalii precum QSB, aurora sau o deschidere Sporadic-E. Câmpurile sunt separate în modelul QSO pentru a permite ulterior calculul din locator, integrarea indicilor solari și a serviciilor de propagare.
 
@@ -91,6 +95,7 @@ database.py             acces SQLite parametrizat
 validators.py           validare și benzi
 utils/maidenhead.py     conversie locală coordonate/locator
 services/location_service.py API Windows Location izolat de interfață
+services/propagation_service.py reguli testabile pentru sugestia implicită de propagare
 adif_export.py          export ADIF
 excel_export.py         export Excel
 backup.py               backup SQLite
