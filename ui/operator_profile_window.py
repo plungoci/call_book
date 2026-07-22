@@ -12,6 +12,7 @@ from services.location_service import (LocationDisabledError, LocationDnsError, 
 from utils.maidenhead import coordinates_to_maidenhead
 from validators import normalize_callsign, normalize_name
 from .tooltip import Tooltip
+from .common_widgets import ScrollableFrame
 
 class OperatorProfileWindow(tk.Toplevel):
     FIELDS = (("Indicativ personal", "callsign"), ("Nume complet", "full_name"),
@@ -23,10 +24,13 @@ class OperatorProfileWindow(tk.Toplevel):
         ("Putere implicită (W)", "default_power_w"), ("Club radio", "radio_club"), ("Indicativ club", "club_callsign"))
     LOCATION_TIPS = {"latitude":"Coordonata nord-sud, între -90 și 90 de grade.\nPoate fi completată automat sau manual.", "longitude":"Coordonata est-vest, între -180 și 180 de grade.\nPoate fi completată automat sau manual.", "location_accuracy_m":"Precizia estimată a localizării, exprimată în metri.\nO valoare mai mică indică o localizare mai precisă.", "grid_square":"Locator radio calculat pe baza coordonatelor geografice.\nExemplu: KN34BK."}
     def __init__(self, parent: tk.Misc, db: Database) -> None:
-        super().__init__(parent); self.db=db; self.title("Date operator"); self.resizable(False, False); self.transient(parent)
+        super().__init__(parent); self.db=db; self.title("Date operator"); self.geometry("610x680"); self.minsize(460, 420); self.transient(parent)
         self.vars={name:tk.StringVar() for _,name in self.FIELDS}; self.detect_button=None; self._build(); self.load_profile(); self.grab_set()
     def _build(self) -> None:
-        content=ttk.Frame(self,padding=12); content.pack(fill="both",expand=True)
+        scrollable = ScrollableFrame(self)
+        scrollable.pack(fill="both", expand=True)
+        content=ttk.Frame(scrollable.content,padding=12); content.pack(fill="both",expand=True)
+        content.columnconfigure(1, weight=1)
         for i,(label,name) in enumerate(self.FIELDS):
             ttk.Label(content,text=label).grid(row=i,column=0,sticky="w",pady=2)
             entry=ttk.Entry(content,textvariable=self.vars[name],width=42); entry.grid(row=i,column=1,sticky="ew",pady=2)
