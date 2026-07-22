@@ -15,6 +15,13 @@ class SpaceWeatherData:
     source: str
     observed_at_utc: datetime
     fetched_at_utc: datetime
+    xray_flux: float | None = None
+    proton_flux: float | None = None
+    electron_flux: float | None = None
+    auroral_activity: float | None = None
+    solar_wind_speed: float | None = None
+    solar_wind_density: float | None = None
+    bz: float | None = None
 
 
 @dataclass(frozen=True)
