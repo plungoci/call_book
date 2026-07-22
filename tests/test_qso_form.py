@@ -47,6 +47,21 @@ class QSOFormTests(unittest.TestCase):
         self.assertIn("callsign", self.form.fields)
         self.assertIn("indicativul", self.form.fields["callsign"].toolTip().lower())
 
+    def test_live_formatting_preserves_cursor_position(self):
+        callsign = self.form.fields["callsign"]
+        callsign.setText("yo8abc")
+        callsign.setCursorPosition(3)
+        callsign.textEdited.emit(callsign.text())
+        self.assertEqual(callsign.text(), "YO8ABC")
+        self.assertEqual(callsign.cursorPosition(), 3)
+
+        operator_name = self.form.fields["operator_name"]
+        operator_name.setText("ion popescu")
+        operator_name.setCursorPosition(4)
+        operator_name.textEdited.emit(operator_name.text())
+        self.assertEqual(operator_name.text(), "Ion Popescu")
+        self.assertEqual(operator_name.cursorPosition(), 4)
+
     def test_callsign_can_be_loaded_serialized_and_cleared(self):
         qso = QSO(
             id=7,

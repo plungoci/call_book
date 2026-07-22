@@ -18,7 +18,7 @@ from models import QSO
 from propagation import PROPAGATION_MODES
 from services.band_detector import BandDetector
 from services.propagation_service import PROPAGATION_UNKNOWN
-from validators import format_name_input, normalize_callsign
+from utils.text_formatters import format_callsign, format_operator_name
 
 
 MODES = (
@@ -117,11 +117,11 @@ class QSOForm(QGroupBox):
         self.notes.setToolTip("Informații suplimentare despre QSO.")
         layout.addWidget(self.notes)
 
-        self._line("callsign").editingFinished.connect(
-            lambda: self._format("callsign", normalize_callsign)
+        self._line("callsign").textEdited.connect(
+            lambda text: self._format_live_input("callsign", format_callsign, text)
         )
-        self._line("operator_name").editingFinished.connect(
-            lambda: self._format("operator_name", format_name_input)
+        self._line("operator_name").textEdited.connect(
+            lambda text: self._format_live_input("operator_name", format_operator_name, text)
         )
         self._line("frequency_mhz").textChanged.connect(self._frequency_changed)
         self._line("band").textChanged.connect(self._context)
@@ -165,8 +165,19 @@ class QSOForm(QGroupBox):
         else:
             widget.setText(str(value))
 
-    def _format(self, key, formatter):
-        self.set_text(key, formatter(self.text(key)))
+    def _format_live_input(self, key, formatter, value):
+        """Format a user edit without moving the insertion cursor.
+
+        ``textEdited`` is emitted only for user edits, so calling ``setText`` here
+        cannot recursively re-enter this handler for programmatic form loading.
+        """
+        formatted = formatter(value)
+        if formatted == value:
+            return
+        line = self._line(key)
+        cursor_position = line.cursorPosition()
+        line.setText(formatted)
+        line.setCursorPosition(min(cursor_position, len(formatted)))
 
     def _frequency_changed(self, value):
         if self._loading:
