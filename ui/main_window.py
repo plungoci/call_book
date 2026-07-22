@@ -26,9 +26,13 @@ class MainWindow(tk.Tk):
         super().__init__()
         self.db, self.app_config = db, config
         self.operator_profile = self.db.get_operator_profile()
+        self.search_panel_visible = False
+        self.operator_profile_window: OperatorProfileWindow | None = None
+        self.repeater_window: RepeaterWindow | None = None
+        self._clock_after_id: str | None = None
         self.title("Radio Logbook")
         self.geometry("1250x760")
-        self._menu()
+        self.create_menu_bar()
         self.clock = ttk.Label(self)
         self.clock.pack(anchor="e", padx=8)
         self._clock()
@@ -37,28 +41,39 @@ class MainWindow(tk.Tk):
         self.form.pack(fill="x", padx=8)
         self._actions()
         self._table()
+        self.protocol("WM_DELETE_WINDOW", self.close_application)
         self.bind_all("<Control-n>", lambda event: self.cancel_edit())
         self.bind_all("<Control-s>", lambda event: self.save())
         self.bind_all("<Delete>", lambda event: self.delete())
         self.bind_all("<Escape>", lambda event: self.cancel_edit())
-        self.bind_all("<Control-f>", lambda event: self.search.focus_set())
+        self.bind_all("<Control-f>", self.focus_search)
         self.refresh()
 
-    def _menu(self) -> None:
+    def create_menu_bar(self) -> None:
+        """Create the standard Tk menu bar without duplicating action logic."""
         menu = tk.Menu(self)
+        file_menu = tk.Menu(menu, tearoff=False)
+        file_menu.add_command(label="Exportă Excel", command=self.excel)
+        file_menu.add_command(label="Exportă ADIF", command=self.adif)
+        file_menu.add_separator()
+        file_menu.add_command(label="Creează backup", command=self.backup)
+        file_menu.add_separator()
+        file_menu.add_command(label="Ieșire", command=self.close_application)
+        menu.add_cascade(label="Fișier", menu=file_menu)
         settings = tk.Menu(menu, tearoff=False)
         settings.add_command(label="Date operator", command=self.open_operator_profile)
+        settings.add_command(label="Repetoare", command=self.open_repeaters)
         menu.add_cascade(label="Setări", menu=settings)
         self.config(menu=menu)
 
     def _clock(self) -> None:
         now, utc = datetime.now().astimezone(), datetime.now(timezone.utc)
         self.clock.config(text=f"Local: {now:%Y-%m-%d %H:%M:%S %Z} | UTC: {utc:%Y-%m-%d %H:%M:%S}")
-        self.after(1000, self._clock)
+        self._clock_after_id = self.after(1000, self._clock)
 
     def _filters(self) -> None:
-        bar = ttk.Frame(self)
-        bar.pack(fill="x", padx=8)
+        self.search_panel = ttk.Frame(self)
+        self.search_panel.pack(fill="x", padx=8)
         self.search, self.band, self.mode = tk.StringVar(), tk.StringVar(), tk.StringVar()
         self.rep, self.date_from, self.date_to = tk.StringVar(), tk.StringVar(), tk.StringVar()
         fields = (("Indicativ", self.search, "Filtrează rapid QSO-urile după indicativ."),
@@ -68,21 +83,20 @@ class MainWindow(tk.Tk):
                   ("De la", self.date_from, "Afișează QSO-uri de la această dată."),
                   ("Până la", self.date_to, "Afișează QSO-uri până la această dată."))
         for label, variable, tip in fields:
-            ttk.Label(bar, text=label).pack(side="left")
-            entry = ttk.Entry(bar, textvariable=variable, width=12)
+            ttk.Label(self.search_panel, text=label).pack(side="left")
+            entry = ttk.Entry(self.search_panel, textvariable=variable, width=12)
             entry.pack(side="left")
             Tooltip(entry, tip)
-        buttons = (("Caută", self.refresh, "Filtrează rapid QSO-urile după indicativ.", "left"),
-                   ("Reset", self.reset, "Șterge toate filtrele de căutare.", "left"),
-                   ("Repetoare", lambda: RepeaterWindow(self, self.db, self.repeater_changed), "Administrează lista de repetoare.", "right"),
-                   ("Date operator", self.open_operator_profile, "Configurează informațiile personale ale proprietarului logbook-ului.", "right"),
-                   ("Backup", self.backup, "Creează un backup al bazei de date SQLite.", "right"),
-                   ("Excel", self.excel, "Exportă toate QSO-urile într-un fișier Excel.", "right"),
-                   ("ADIF", self.adif, "Exportă logbook-ul în format ADIF compatibil cu alte aplicații.", "right"))
-        for text, command, tip, side in buttons:
-            button = ttk.Button(bar, text=text, command=command)
-            button.pack(side=side)
+            if variable is self.search:
+                self.search_entry = entry
+        buttons = (("Caută", self.refresh, "Filtrează rapid QSO-urile după indicativ."),
+                   ("Resetează filtrele", self.reset, "Șterge toate filtrele de căutare."))
+        for text, command, tip in buttons:
+            button = ttk.Button(self.search_panel, text=text, command=command)
+            button.pack(side="left")
             Tooltip(button, tip)
+        # Keep the panel's pack configuration, but start with it out of view.
+        self.search_panel.pack_forget()
 
     def _actions(self) -> None:
         actions = ttk.Frame(self)
@@ -102,6 +116,29 @@ class MainWindow(tk.Tk):
         self.delete_button = ttk.Button(actions, text="Șterge", command=self.delete, state="disabled")
         self.delete_button.pack(side="left")
         Tooltip(self.delete_button, "Șterge definitiv QSO-ul selectat după confirmare.")
+        self.search_toggle_button = ttk.Button(actions, text="Caută / Filtrează", command=self.toggle_search_panel)
+        self.search_toggle_button.pack(side="left")
+        Tooltip(self.search_toggle_button, "Afișează sau ascunde opțiunile de căutare și filtrare a QSO-urilor.")
+
+    def toggle_search_panel(self) -> None:
+        """Show or hide filters without changing their values or active results."""
+        if self.search_panel_visible:
+            self.search_panel.pack_forget()
+            self.search_toggle_button.config(text="Caută / Filtrează")
+            self.search_panel_visible = False
+            return
+        self.search_panel.pack(fill="x", padx=8, before=self.form)
+        self.search_toggle_button.config(text="Ascunde căutarea")
+        self.search_panel_visible = True
+        self.search_entry.focus_set()
+
+    def focus_search(self, event: object = None) -> str:
+        """Handle Ctrl+F: display filters if necessary, then focus callsign."""
+        if not self.search_panel_visible:
+            self.toggle_search_panel()
+        else:
+            self.search_entry.focus_set()
+        return "break"
 
     def _table(self) -> None:
         columns = ("id", "date", "time", "callsign", "name", "freq", "band", "mode", "repeater", "sent", "received", "qsl")
@@ -181,7 +218,23 @@ class MainWindow(tk.Tk):
         return [QSO(**{key: row[key] for key in QSO.__dataclass_fields__ if key in row.keys()}) for row in self.db.list_qsos(self.filters())]
 
     def open_operator_profile(self) -> None:
-        OperatorProfileWindow(self, self.db)
+        if self._raise_window(self.operator_profile_window):
+            return
+        self.operator_profile_window = OperatorProfileWindow(self, self.db)
+
+    def open_repeaters(self) -> None:
+        """Open the existing repeater manager, reusing it when already open."""
+        if self._raise_window(self.repeater_window):
+            return
+        self.repeater_window = RepeaterWindow(self, self.db, self.repeater_changed)
+
+    @staticmethod
+    def _raise_window(window: tk.Toplevel | None) -> bool:
+        if window is not None and window.winfo_exists():
+            window.lift()
+            window.focus_force()
+            return True
+        return False
 
     def adif(self) -> None:
         self._export("ADIF", ".adi", [("ADIF", "*.adi")], lambda qsos, destination: export_adif(qsos, destination=destination, profile=self.db.get_operator_profile()))
@@ -208,3 +261,16 @@ class MainWindow(tk.Tk):
 
     def repeater_changed(self) -> None:
         self.form.repeaters = self.db.list_repeaters
+
+    def close_application(self) -> None:
+        """Stop scheduled UI work and close child dialogs before destroying Tk."""
+        if self._clock_after_id is not None:
+            try:
+                self.after_cancel(self._clock_after_id)
+            except tk.TclError:
+                pass
+            self._clock_after_id = None
+        for window in (self.operator_profile_window, self.repeater_window):
+            if window is not None and window.winfo_exists():
+                window.destroy()
+        self.destroy()
