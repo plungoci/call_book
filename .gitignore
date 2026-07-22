@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.py[cod]
+data/*.db
+exports/*.xlsx
+exports/*.adi
+backups/*.db
+radio_logbook.log
+config.json
