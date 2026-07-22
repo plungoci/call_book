@@ -10,11 +10,12 @@ from services.space_weather_service import InternetConnectionError, SpaceWeather
 from .tooltip import Tooltip
 class PropagationMapPanel(ttk.LabelFrame):
  def __init__(self,parent, profile_getter, on_expand=None):
-  super().__init__(parent,text="Hartă propagare",padding=6);self.profile_getter=profile_getter;self.on_expand=on_expand;self.executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix="propagation");self.request_id=0;self.after_id=None;self.closing=False;self.propagation_photo=None;self.internet_unavailable=False
+  super().__init__(parent,text="Hartă propagare",padding=6);self.profile_getter=profile_getter;self.on_expand=on_expand;self.executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix="propagation");self.request_id=0;self.after_id=None;self.closing=False;self.propagation_photo=None;self.propagation_image=None;self.internet_unavailable=False
   self.status=tk.StringVar(value="Selectează o bandă pentru afișarea estimării de propagare.");self.details=tk.StringVar(value="Estimare de propagare — fără date încărcate")
   top=ttk.Frame(self);top.pack(fill="x");ttk.Label(top,textvariable=self.status).pack(side="left");self.refresh_button=ttk.Button(top,text="Actualizează",command=lambda:self.schedule(self.band, self.frequency,0));self.refresh_button.pack(side="right");Tooltip(self.refresh_button,"Descarcă cele mai recente date disponibile și regenerează harta pentru banda selectată.")
   if on_expand: ttk.Button(top,text="Mărește",command=on_expand).pack(side="right",padx=4)
-  self.image=ttk.Label(self,text="Selectează o bandă pentru afișarea estimării de propagare.",anchor="center");self.image.pack(fill="both",expand=True,pady=4);Tooltip(self.image,"Afișează o estimare a zonelor favorabile pentru banda selectată, folosind date actuale de vreme spațială.")
+  self.map_padding=12;self.map_area=ttk.Frame(self,padding=(self.map_padding,8));self.map_area.pack(fill="x")
+  self.image=ttk.Label(self.map_area,text="Selectează o bandă pentru afișarea estimării de propagare.",anchor="center");self.image.pack(anchor="center");self.map_area.bind("<Configure>",self._resize_map);Tooltip(self.image,"Afișează o estimare a zonelor favorabile pentru banda selectată, folosind date actuale de vreme spațială.")
   ttk.Label(self,textvariable=self.details,wraplength=650,justify="left").pack(fill="x");ttk.Label(self,text="Legendă: Foarte slabă / Slabă / Moderată / Bună / Foarte bună. Modelele și contururile diferențiază zonele; estimare, nu garanție.",wraplength=650).pack(anchor="w")
   self.band="";self.frequency=None
  def schedule(self,band,frequency=None,delay=700):
@@ -40,11 +41,31 @@ class PropagationMapPanel(ttk.LabelFrame):
   future.add_done_callback(lambda f, request_id=rid:self.after(0,lambda: self._finish(request_id,f)))
  def _work(self,request):
   weather=SpaceWeatherService().fetch();return PropagationMapService().generate(request,weather),weather
+ @staticmethod
+ def _fit_size(image_width,image_height,available_width):
+  """Return a proportional size that leaves room around the map and its text."""
+  if image_width <= 0 or image_height <= 0 or available_width <= 0:return None
+  width=min(image_width,max(1,round(available_width*.68)))
+  return width,max(1,round(width*image_height/image_width))
+ def _resize_map(self,event=None):
+  if self.propagation_image is None:return
+  available_width=(event.width if event else self.map_area.winfo_width())-2*self.map_padding
+  size=self._fit_size(self.propagation_image.width,self.propagation_image.height,available_width)
+  if size is None:return
+  if getattr(self,"_display_size",None)==size:return
+  self._display_size=size
+  from PIL import Image, ImageTk
+  display=self.propagation_image.resize(size,Image.Resampling.LANCZOS)
+  self.propagation_photo=ImageTk.PhotoImage(display)
+  self.image.config(image=self.propagation_photo,text="")
  def _finish(self,rid,future):
   if self.closing or rid!=self.request_id:return
   self.refresh_button.config(state="normal")
   try:
-   result,weather=future.result(); self.propagation_photo=tk.PhotoImage(file=result.image_path);self.image.config(image=self.propagation_photo,text="")
+   result,weather=future.result()
+   from PIL import Image
+   with Image.open(result.image_path) as image:self.propagation_image=image.convert("RGBA")
+   self._display_size=None;self._resize_map()
    def val(v):return "Indisponibil" if v is None else str(v)
    self.status.set("Date din cache" if result.is_cached else "Actualizat")
    self.details.set(f"Bandă: {result.band}; frecvență: {self.frequency or 'Indisponibil'} MHz; UTC: {result.generated_at_utc:%Y-%m-%d %H:%M}; sursă: {result.source_description}; SFI/F10.7: {val(weather.solar_flux)}; Kp: {val(weather.kp_index)}; A-index: {val(weather.a_index)}; pete: {val(weather.sunspot_number)}; blackout: {val(weather.radio_blackout_level)}. " + " ".join(result.warnings))
