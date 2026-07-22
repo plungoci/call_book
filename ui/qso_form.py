@@ -87,7 +87,6 @@ class QSOForm(QGroupBox):
     contextChanged = Signal(str, str)
 
     def __init__(self, repeaters, default_power_w=None):
-        validate_field_labels()
         super().__init__("QSO · toate orele sunt UTC")
         self.repeaters = repeaters
         self.default_power_w = default_power_w
@@ -104,8 +103,10 @@ class QSOForm(QGroupBox):
             grid.addWidget(box, 0, column)
             for key in keys:
                 widget = self._create_widget(key)
-                # Validation above surfaces configuration errors.  The fallback
-                # still keeps a future dynamically-added field from crashing UI.
+                # A missing translation must not prevent the logbook from
+                # opening.  The explicit validator remains available to tests
+                # and development checks, while this fallback keeps the UI
+                # usable with a readable generated label.
                 label_text = LABELS.get(key, key.replace("_", " ").title())
                 widget.setToolTip(self._tooltip(key, label_text))
                 form.addRow(label_text, widget)
