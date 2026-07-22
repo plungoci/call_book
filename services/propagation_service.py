@@ -1,4 +1,4 @@
-"""Rules for default QSO propagation suggestions, independent of Tkinter.
+"""Rules for default QSO propagation suggestions, independent of GUI frameworks.
 
 The result is a *default suggestion*, not a measurement of radio conditions.
 """

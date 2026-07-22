@@ -1,2 +1,1 @@
-"""Tkinter user interface package."""
-"""Tkinter user-interface components."""
+"""PySide6 user-interface components."""

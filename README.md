@@ -13,7 +13,7 @@ Aplicație desktop locală/offline pentru evidența legăturilor radioamatorice 
 
 ## Cerințe și instalare
 
-Este necesar Python 3.11+ și o instalare Python care include Tkinter.
+Este necesar Python 3.11+ și o instalare Python care include PySide6 / Qt for Python.
 
 ```bash
 python -m venv .venv
@@ -90,14 +90,14 @@ adif_export.py          export ADIF
 excel_export.py         export Excel
 backup.py               backup SQLite
 config.py               configurare JSON
-ui/                     interfața Tkinter/ttk
+ui/                     interfața PySide6 / Qt for Python
 tests/                  teste unittest
 data/ exports/ backups/ date runtime
 ```
 
 ## Limitări și extensii
 
-Interfața necesită un calculator cu server grafic pentru verificare vizuală. În medii headless se verifică importurile și logica independentă de UI, fără a porni o buclă Tkinter persistentă. Nu sunt implementate QRZ, LoTW/eQSL, CAT, cloud, hărți, autentificare sau o aplicație web; modulele actuale permit adăugarea lor ulterioară fără a amesteca UI cu persistenta.
+Interfața necesită un calculator cu server grafic pentru verificare vizuală. În medii headless se verifică importurile și logica independentă de UI, fără a porni o buclă PySide6 / Qt for Python persistentă. Nu sunt implementate QRZ, LoTW/eQSL, CAT, cloud, hărți, autentificare sau o aplicație web; modulele actuale permit adăugarea lor ulterioară fără a amesteca UI cu persistenta.
 
 ## Panou condiții de propagare
 

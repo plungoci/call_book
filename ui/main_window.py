@@ -1,264 +1,72 @@
-"""Main, task-oriented window for the radio logbook."""
-from __future__ import annotations
-
+"""Modern PySide6 application shell."""
 from datetime import datetime, timezone
-import logging
 from pathlib import Path
-import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
-
-from application_controller import DuplicateQsoCancelled, LogbookController
-from config import PROPAGATION_REFRESH_INTERVALS, save_config
-from database import Database
+from PySide6.QtCore import QTimer, Qt
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import *
+from application_controller import DuplicateQsoCancelled,LogbookController
+from config import PROPAGATION_REFRESH_INTERVALS,save_config
 from models import QSO
-from .common_widgets import attach_tree_scrollbars
-from .operator_profile_window import OperatorProfileWindow
-from .propagation_panel import PropagationPanel
 from .qso_form import QSOForm
+from .propagation_panel import PropagationPanel
+from .operator_profile_window import OperatorProfileWindow
 from .repeater_window import RepeaterWindow
-from .tooltip import Tooltip
-
-
-class MainWindow(tk.Tk):
-    """Coordinate existing logbook actions inside a calm, tabbed workspace."""
-
-    def __init__(self, db: Database, config: dict[str, str]) -> None:
-        super().__init__()
-        self.db, self.app_config = db, config
-        self.controller = LogbookController(db)
-        self.operator_profile = self.db.get_operator_profile()
-        self.search_panel_visible = False
-        self.operator_profile_window: OperatorProfileWindow | None = None
-        self.repeater_window: RepeaterWindow | None = None
-        self._clock_after_id: str | None = None
-        self._propagation_auto_after_id: str | None = None
-        self.title("Radio Logbook")
-        self.geometry("1440x900")
-        self.minsize(1024, 700)
-        self.create_menu_bar()
-        self._build_shell()
-        self._schedule_propagation_auto_refresh()
-        self.protocol("WM_DELETE_WINDOW", self.close_application)
-        self.bind_all("<Control-n>", lambda event: self.cancel_edit())
-        self.bind_all("<Control-s>", lambda event: self.save())
-        self.bind_all("<Delete>", lambda event: self.delete())
-        self.bind_all("<Escape>", lambda event: self.cancel_edit())
-        self.bind_all("<Control-f>", self.focus_search)
-        self.refresh()
-
-    def _build_shell(self) -> None:
-        toolbar = ttk.Frame(self, padding=(16, 10))
-        toolbar.pack(fill="x")
-        ttk.Label(toolbar, text="Radio Logbook").pack(side="left")
-        ttk.Label(toolbar, text="Jurnal radioamator • operare locală").pack(side="left", padx=(12, 0))
-        ttk.Button(toolbar, text="⌕  Caută", command=self.toggle_search_panel).pack(side="right", padx=(6, 0))
-        self.quick_save = ttk.Button(toolbar, text="Salvează QSO", command=self.save)
-        self.quick_save.pack(side="right")
-        self.clock = ttk.Label(toolbar)
-        self.clock.pack(side="right", padx=18)
-        self._clock()
-
-        self.notebook = ttk.Notebook(self)
-        self.notebook.pack(fill="both", expand=True, padx=12, pady=12)
-        self.log_tab = ttk.Frame(self.notebook, padding=12)
-        self.propagation_tab = ttk.Frame(self.notebook, padding=12)
-        self.location_tab = ttk.Frame(self.notebook, padding=12)
-        self.settings_tab = ttk.Frame(self.notebook, padding=12)
-        self.notebook.add(self.log_tab, text="⌨  Jurnal QSO")
-        self.notebook.add(self.propagation_tab, text="☀  Propagare")
-        self.notebook.add(self.location_tab, text="🌍  Locație")
-        self.notebook.add(self.settings_tab, text="⚙  Setări")
-        self._build_log_tab()
-        self._build_propagation_tab()
-        self._build_location_tab()
-        self._build_settings_tab()
-        self._build_status_bar()
-
-    def _build_log_tab(self) -> None:
-        self._filters()
-        self.form = QSOForm(self.log_tab, self.db.list_repeaters, self.save, self.operator_profile.default_power_w, self.propagation_context_changed)
-        self.form.pack(fill="x", pady=(0, 10))
-        self._actions()
-        table_card = ttk.Frame(self.log_tab, padding=10)
-        table_card.pack(fill="both", expand=True, pady=(10, 0))
-        header = ttk.Frame(table_card)
-        header.pack(fill="x", pady=(0, 7))
-        ttk.Label(header, text="Jurnal QSO").pack(side="left")
-        ttk.Label(header, text="Selectează un rând pentru editare sau ștergere.").pack(side="left", padx=10)
-        self._table(table_card)
-
-    def _build_propagation_tab(self) -> None:
-        intro = ttk.Frame(self.propagation_tab, padding=12)
-        intro.pack(fill="x", pady=(0, 10))
-        ttk.Label(intro, text="Condiții de propagare").pack(anchor="w")
-        ttk.Label(intro, text="Estimări locale bazate pe date space weather; nu reprezintă predicții garantate.").pack(anchor="w", pady=(3, 0))
-        self.propagation_panel = PropagationPanel(self.propagation_tab)
-        self.propagation_panel.pack(fill="both", expand=True)
-        if self.app_config.get("show_propagation_panel", "true").lower() != "true":
-            self.notebook.hide(self.propagation_tab)
-
-    def _build_location_tab(self) -> None:
-        card = ttk.Frame(self.location_tab, padding=20)
-        card.pack(fill="x", anchor="n")
-        ttk.Label(card, text="🌍  Poziția stației").pack(anchor="w")
-        ttk.Label(card, text="Locatorul Maidenhead și datele stației sunt păstrate local în profilul operatorului.").pack(anchor="w", pady=(4, 16))
-        profile = self.operator_profile
-        details = (("Locator Maidenhead", profile.grid_square or profile.maidenhead_locator or "Nesetat"), ("Latitudine", "—" if profile.latitude is None else f"{profile.latitude:.6f}°"), ("Longitudine", "—" if profile.longitude is None else f"{profile.longitude:.6f}°"), ("Sursă", profile.location_source or "Nesetată"))
-        grid = ttk.Frame(card)
-        grid.pack(fill="x")
-        for index, (label, value) in enumerate(details):
-            item = ttk.Frame(grid, padding=12)
-            item.grid(row=0, column=index, sticky="nsew", padx=(0, 8) if index < 3 else 0)
-            ttk.Label(item, text=label).pack(anchor="w")
-            ttk.Label(item, text=value).pack(anchor="w", pady=(3, 0))
-            grid.columnconfigure(index, weight=1)
-        ttk.Button(card, text="Deschide profilul operatorului", command=self.open_operator_profile).pack(anchor="w", pady=(18, 0))
-
-    def _build_settings_tab(self) -> None:
-        ttk.Label(self.settings_tab, text="Setări și administrare").pack(anchor="w")
-        ttk.Label(self.settings_tab, text="Acțiunile sunt grupate pe domenii, fără a aglomera zona de operare.").pack(anchor="w", pady=(3, 14))
-        grid = ttk.Frame(self.settings_tab)
-        grid.pack(fill="x", anchor="n")
-        cards = (("General", "Profil, indicativ și echipament", "Date operator", self.open_operator_profile), ("Repetoare", "Frecvențe, shift, CTCSS și locator", "Administrează repetoare", self.open_repeaters), ("Propagare", "Surse și interval de actualizare", "Setări propagare", self.open_propagation_settings), ("Date", "Exportă jurnalul sau creează o copie", "Creează backup", self.backup))
-        for index, (title, description, action, command) in enumerate(cards):
-            card = ttk.Frame(grid, padding=16)
-            card.grid(row=index // 2, column=index % 2, sticky="nsew", padx=(0, 10) if index % 2 == 0 else 0, pady=(0, 10))
-            ttk.Label(card, text=title).pack(anchor="w")
-            ttk.Label(card, text=description, wraplength=340).pack(anchor="w", pady=(5, 16))
-            ttk.Button(card, text=action, command=command).pack(anchor="w")
-        grid.columnconfigure(0, weight=1); grid.columnconfigure(1, weight=1)
-
-    def _build_status_bar(self) -> None:
-        status = ttk.Frame(self, padding=(14, 6))
-        status.pack(fill="x", side="bottom")
-        self.status_message = tk.StringVar(value="Gata pentru un QSO nou.")
-        ttk.Label(status, textvariable=self.status_message).pack(side="left")
-        ttk.Label(status, text="● Local").pack(side="right")
-        ttk.Label(status, text="NOAA la cerere").pack(side="right", padx=16)
-        ttk.Label(status, text="Radio Logbook").pack(side="right")
-
-    def create_menu_bar(self) -> None:
-        menu = tk.Menu(self); file_menu = tk.Menu(menu, tearoff=False)
-        file_menu.add_command(label="Exportă Excel", command=self.excel); file_menu.add_command(label="Exportă ADIF", command=self.adif); file_menu.add_separator(); file_menu.add_command(label="Creează backup", command=self.backup); file_menu.add_separator(); file_menu.add_command(label="Ieșire", command=self.close_application); menu.add_cascade(label="Fișier", menu=file_menu)
-        settings = tk.Menu(menu, tearoff=False); settings.add_command(label="Date operator", command=self.open_operator_profile); settings.add_command(label="Repetoare", command=self.open_repeaters); settings.add_command(label="Setări condiții propagare", command=self.open_propagation_settings); menu.add_cascade(label="Setări", menu=settings)
-        if "app_config" in self.__dict__:
-            view = tk.Menu(menu, tearoff=False); self.show_propagation_panel_var = tk.BooleanVar(value=self.app_config.get("show_propagation_panel", "true").lower() == "true"); view.add_checkbutton(label="Condiții propagare", variable=self.show_propagation_panel_var, command=self.toggle_propagation_panel); view.add_command(label="Actualizează condițiile propagării", command=self.refresh_propagation_panel); menu.add_cascade(label="Vizualizare", menu=view)
-        self.config(menu=menu)
-
-    def open_propagation_settings(self) -> None:
-        window = tk.Toplevel(self); window.title("Setări condiții propagare"); window.transient(self)
-        enabled = tk.BooleanVar(value=self.app_config.get("propagation_auto_refresh_minutes", "15") in PROPAGATION_REFRESH_INTERVALS); interval = tk.StringVar(value=self.app_config.get("propagation_auto_refresh_minutes", "15"))
-        card = ttk.Frame(window, padding=16); card.pack(fill="both", expand=True, padx=12, pady=12)
-        ttk.Label(card, text="Actualizare propagare").pack(anchor="w"); ttk.Label(card, text="Datele sunt descărcate din surse instituționale și oferă o estimare orientativă.", wraplength=480).pack(anchor="w", pady=(5, 12)); ttk.Checkbutton(card, text="Actualizare automată condiții", variable=enabled).pack(anchor="w")
-        row = ttk.Frame(card); row.pack(fill="x", pady=10); ttk.Label(row, text="Interval:").pack(side="left"); ttk.Combobox(row, textvariable=interval, values=("10", "15", "30", "60"), state="readonly", width=8).pack(side="left", padx=6); ttk.Label(row, text="minute").pack(side="left")
-        def save_settings() -> None:
-            self.app_config["propagation_auto_refresh_minutes"] = interval.get() if enabled.get() else "0"; save_config(self.app_config)
-            if self._propagation_auto_after_id:
-                try: self.after_cancel(self._propagation_auto_after_id)
-                except tk.TclError: pass
-            self._schedule_propagation_auto_refresh(); self._set_status("Setările de propagare au fost actualizate."); window.destroy()
-        ttk.Button(card, text="Salvează", command=save_settings).pack(anchor="e")
-
-    def propagation_context_changed(self, band: str, frequency: str) -> None:
-        try: value = float(frequency) if frequency.strip() else None
-        except ValueError: value = None
-        if "propagation_panel" in self.__dict__ and self.show_propagation_panel_var.get(): self.propagation_panel.schedule(band, value)
-    def refresh_propagation_panel(self) -> None: self.propagation_panel.refresh(force=True)
-    def toggle_propagation_panel(self) -> None:
-        visible = self.show_propagation_panel_var.get(); self.app_config["show_propagation_panel"] = "true" if visible else "false"; save_config(self.app_config)
-        if visible: self.notebook.add(self.propagation_tab, text="☀  Propagare"); self.refresh_propagation_panel()
-        else: self.notebook.hide(self.propagation_tab)
-    def _schedule_propagation_auto_refresh(self) -> None:
-        try: minutes = int(self.app_config.get("propagation_auto_refresh_minutes", "15"))
-        except ValueError: minutes = 15
-        if str(minutes) in PROPAGATION_REFRESH_INTERVALS: self._propagation_auto_after_id = self.after(minutes * 60 * 1000, self._automatic_propagation_refresh)
-    def _automatic_propagation_refresh(self) -> None:
-        if self.show_propagation_panel_var.get() and self.form.vars["band"].get(): self.refresh_propagation_panel()
-        self._schedule_propagation_auto_refresh()
-    def _clock(self) -> None:
-        now, utc = datetime.now().astimezone(), datetime.now(timezone.utc); self.clock.config(text=f"Local {now:%H:%M:%S}  |  UTC {utc:%H:%M:%S}"); self._clock_after_id = self.after(1000, self._clock)
-
-    def _filters(self) -> None:
-        self.search_panel = ttk.Frame(self.log_tab, padding=10); self.search, self.band, self.mode = tk.StringVar(), tk.StringVar(), tk.StringVar(); self.rep, self.date_from, self.date_to = tk.StringVar(), tk.StringVar(), tk.StringVar()
-        fields = (("Indicativ", self.search), ("Bandă", self.band), ("Mod", self.mode), ("Repetor ID", self.rep), ("De la", self.date_from), ("Până la", self.date_to))
-        for label, variable in fields:
-            group = ttk.Frame(self.search_panel); group.pack(side="left", fill="x", expand=True, padx=3); ttk.Label(group, text=label).pack(anchor="w"); entry = ttk.Entry(group, textvariable=variable); entry.pack(fill="x"); Tooltip(entry, f"Filtrează QSO-urile după {label.lower()}.")
-            if variable is self.search: self.search_entry = entry
-        ttk.Button(self.search_panel, text="Aplică", command=self.refresh).pack(side="left", padx=(8, 3)); ttk.Button(self.search_panel, text="Resetează", command=self.reset).pack(side="left")
-    def _actions(self) -> None:
-        actions = ttk.Frame(self.log_tab); actions.pack(fill="x")
-        self.save_button = ttk.Button(actions, text="Salvează QSO", command=self.save); self.save_button.pack(side="left"); Tooltip(self.save_button, "Salvează QSO-ul în baza de date.")
-        for name, command, attr, state in (("QSO nou", self.cancel_edit, None, "normal"), ("Anulează editarea", self.cancel_edit, "cancel_button", "disabled"), ("Editează", self.edit, "edit_button", "disabled"), ("Șterge", self.delete, "delete_button", "disabled")):
-            button = ttk.Button(actions, text=name, command=command, state=state); button.pack(side="left", padx=(6, 0));
-            if attr: setattr(self, attr, button)
-        self.search_toggle_button = ttk.Button(actions, text="Filtrează", command=self.toggle_search_panel); self.search_toggle_button.pack(side="right")
-    def toggle_search_panel(self) -> None:
-        if self.search_panel_visible:
-            self.search_panel.pack_forget(); self.search_toggle_button.config(text="Filtrează"); self.search_panel_visible = False; return
-        self.search_panel.pack(fill="x", padx=8, before=self.form); self.search_toggle_button.config(text="Ascunde filtrele"); self.search_panel_visible = True; self.search_entry.focus_set()
-    def focus_search(self, event: object = None) -> str:
-        if not self.search_panel_visible: self.toggle_search_panel()
-        else: self.search_entry.focus_set()
-        return "break"
-    def _table(self, parent: tk.Misc) -> None:
-        columns = ("id", "date", "time", "callsign", "name", "freq", "band", "mode", "repeater", "sent", "received", "qsl")
-        self.table_container, self.tree = attach_tree_scrollbars(parent, columns=columns, show="headings")
-        for column in columns: self.tree.heading(column, text=column.upper()); self.tree.column(column, width=105, minwidth=70, stretch=True)
-        self.table_container.pack(fill="both", expand=True); self.tree.bind("<<TreeviewSelect>>", self.selection_changed); Tooltip(self.tree, "Lista QSO-urilor salvate.")
-    def filters(self) -> dict[str, str]: return {"callsign": self.search.get(), "band": self.band.get(), "mode": self.mode.get(), "repeater_id": self.rep.get(), "date_from": self.date_from.get(), "date_to": self.date_to.get()}
-    def refresh(self) -> None:
-        self.tree.delete(*self.tree.get_children())
-        for row in self.db.list_qsos(self.filters()):
-            dt = row["qso_start_utc"]; self.tree.insert("", "end", iid=row["id"], values=(row["id"], dt[:10], dt[11:19], row["callsign"], row["operator_name"], row["frequency_mhz"], row["band"], row["mode"], row["repeater_name"] or "", row["rst_sent"], row["rst_received"], row["qsl_status"]))
-        self.selection_changed(); self._set_status(f"{len(self.tree.get_children())} QSO-uri afișate.")
-    def selection_changed(self, event: object = None) -> None:
-        state = "normal" if self.tree.selection() else "disabled"; self.edit_button.config(state=state); self.delete_button.config(state=state)
-    def edit(self) -> None:
-        if self.tree.selection(): self.form.load(self.db.get_qso(int(self.tree.selection()[0]))); self.save_button.config(text="Actualizează QSO"); self.quick_save.config(text="Actualizează QSO"); self.cancel_button.config(state="normal"); self.notebook.select(self.log_tab)
-    def cancel_edit(self) -> None:
-        self.form.new(); self.save_button.config(text="Salvează QSO"); self.quick_save.config(text="Salvează QSO"); self.cancel_button.config(state="disabled"); self.tree.selection_remove(self.tree.selection()); self._set_status("Gata pentru un QSO nou.")
-    def save(self) -> None:
-        try:
-            _, editing = self.controller.save_qso(self.form.value(), lambda _: messagebox.askyesno("Posibil duplicat", "Există un QSO similar în ±2 minute. Salvați totuși?")); self.refresh(); self.cancel_edit(); self._set_status("QSO actualizat." if editing else "QSO salvat.")
-        except DuplicateQsoCancelled: return
-        except (ValueError, OSError, KeyError) as exc: logging.exception("QSO save error"); messagebox.showerror("Eroare", str(exc))
-    def delete(self) -> None:
-        if not self.tree.selection(): return
-        qso = self.db.get_qso(int(self.tree.selection()[0])); when = qso.qso_start_utc.replace("T", " ")[:19] + " UTC"; prompt = f"Sigur dorești ștergerea acestui QSO?\n\n{qso.callsign}\n{qso.frequency_mhz:.3f} MHz\n{when}"
-        if messagebox.askyesno("Confirmare ștergere", prompt): self.db.delete_qso(qso.id); self.refresh(); self.cancel_edit(); self._set_status("QSO șters.")
-    def reset(self) -> None:
-        for variable in (self.search, self.band, self.mode, self.rep, self.date_from, self.date_to): variable.set("")
-        self.refresh()
-    def selected_qsos(self) -> list[QSO]: return self.controller.list_qsos(self.filters())
-    def open_operator_profile(self) -> None:
-        if self._raise_window(self.operator_profile_window): return
-        self.operator_profile_window = OperatorProfileWindow(self, self.db)
-    def open_repeaters(self) -> None:
-        if self._raise_window(self.repeater_window): return
-        self.repeater_window = RepeaterWindow(self, self.db, self.repeater_changed)
-    @staticmethod
-    def _raise_window(window: tk.Toplevel | None) -> bool:
-        if window is not None and window.winfo_exists(): window.lift(); window.focus_force(); return True
-        return False
-    def adif(self) -> None: self._export("ADIF", ".adi", [("ADIF", "*.adi")], self.controller.export_adif)
-    def excel(self) -> None: self._export("Excel", ".xlsx", [("Excel", "*.xlsx")], self.controller.export_excel)
-    def _export(self, title: str, extension: str, filetypes: list[tuple[str, str]], exporter: object) -> None:
-        try:
-            filename = filedialog.asksaveasfilename(initialdir="exports", defaultextension=extension, filetypes=filetypes)
-            if filename: self._set_status(f"Export {title} creat: {exporter(self.selected_qsos(), destination=Path(filename))}")
-        except Exception as exc: logging.exception("%s export", title); messagebox.showerror("Eroare export", str(exc))
-    def backup(self) -> None:
-        try: self._set_status(f"Backup creat: {self.controller.create_backup()}")
-        except Exception as exc: logging.exception("Backup"); messagebox.showerror("Eroare backup", str(exc))
-    def repeater_changed(self) -> None: self.form.repeaters = self.db.list_repeaters
-    def _set_status(self, message: str) -> None:
-        if hasattr(self, "status_message"): self.status_message.set(message)
-    def close_application(self) -> None:
-        self.propagation_panel.shutdown()
-        for after_id in (self._propagation_auto_after_id, self._clock_after_id):
-            if after_id:
-                try: self.after_cancel(after_id)
-                except tk.TclError: pass
-        for window in (self.operator_profile_window, self.repeater_window):
-            if window is not None and window.winfo_exists(): window.destroy()
-        self.destroy()
+DARK='''QWidget{background:#171b22;color:#e6edf3;font:10pt "Segoe UI"} QLineEdit,QTextEdit,QComboBox,QTableWidget{background:#222833;border:1px solid #394454;border-radius:5px;padding:5px} QPushButton{background:#2f81f7;border:0;border-radius:5px;padding:7px 12px} QPushButton:disabled{background:#394454;color:#8b949e} QGroupBox{border:1px solid #394454;border-radius:7px;margin-top:10px;padding-top:8px;font-weight:bold} QTabBar::tab{padding:9px 18px;background:#222833} QHeaderView::section{background:#222833;padding:6px;border:0}'''
+class MainWindow(QMainWindow):
+ def __init__(self,db,config):
+  super().__init__();self.db=db;self.app_config=config;self.controller=LogbookController(db);self.operator_profile=db.get_operator_profile();self.setWindowTitle('Radio Logbook');self.resize(1440,900);self.setMinimumSize(1024,700);self.setStyleSheet(DARK);self._menu();self._build();self.clock_timer=QTimer(self);self.clock_timer.timeout.connect(self._clock);self.clock_timer.start(1000);self._clock();self.refresh()
+ def _menu(self):
+  file=self.menuBar().addMenu('Fișier');
+  for title,fn in [('Exportă Excel',self.excel),('Exportă ADIF',self.adif),('Creează backup',self.backup),('Ieșire',self.close)]:file.addAction(QAction(title,self,triggered=fn))
+  settings=self.menuBar().addMenu('Setări');settings.addAction('Date operator',self.open_operator_profile);settings.addAction('Repetoare',self.open_repeaters);settings.addAction('Setări propagare',self.open_propagation_settings)
+ def _build(self):
+  central=QWidget();self.setCentralWidget(central);root=QVBoxLayout(central);bar=QHBoxLayout();bar.addWidget(QLabel('<h2>Radio Logbook</h2>'));bar.addWidget(QLabel('Jurnal radioamator · operare locală'));bar.addStretch();self.clock=QLabel();bar.addWidget(self.clock);save=QPushButton('Salvează QSO');save.clicked.connect(self.save);bar.addWidget(save);root.addLayout(bar);self.tabs=QTabWidget();root.addWidget(self.tabs);self.log=QWidget();self.propagation_tab=QWidget();self.location=QWidget();self.settings=QWidget();self.tabs.addTab(self.log,'Jurnal QSO');self.tabs.addTab(self.propagation_tab,'Propagare');self.tabs.addTab(self.location,'Locație');self.tabs.addTab(self.settings,'Setări');self._log();self._propagation();self._location();self._settings();self.status=QLabel('Gata pentru un QSO nou.');root.addWidget(self.status)
+ def _log(self):
+  l=QVBoxLayout(self.log); self.filters_edits={};filters=QHBoxLayout()
+  for key,label in [('callsign','Indicativ'),('band','Bandă'),('mode','Mod'),('repeater_id','Repetor ID'),('date_from','De la'),('date_to','Până la')]: e=QLineEdit();e.setPlaceholderText(label);filters.addWidget(e);self.filters_edits[key]=e
+  b=QPushButton('Aplică filtre');b.clicked.connect(self.refresh);filters.addWidget(b);l.addLayout(filters);self.form=QSOForm(self.db.list_repeaters,self.operator_profile.default_power_w);self.form.contextChanged.connect(self.propagation_context_changed);l.addWidget(self.form);actions=QHBoxLayout()
+  for name,fn in [('QSO nou',self.cancel_edit),('Editează',self.edit),('Șterge',self.delete)]:b=QPushButton(name);b.clicked.connect(fn);actions.addWidget(b)
+  actions.addStretch();l.addLayout(actions);self.table=QTableWidget(0,12);self.table.setHorizontalHeaderLabels(('ID','Dată','Ora','Indicativ','Nume','MHz','Bandă','Mod','Repetor','RST T','RST R','QSL'));self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows);self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers);self.table.horizontalHeader().setStretchLastSection(True);l.addWidget(self.table)
+ def _propagation(self):l=QVBoxLayout(self.propagation_tab);self.propagation_panel=PropagationPanel();l.addWidget(self.propagation_panel)
+ def _location(self):
+  l=QVBoxLayout(self.location);p=self.operator_profile;l.addWidget(QLabel(f'<h2>Poziția stației</h2><p>Locator: <b>{p.grid_square or p.maidenhead_locator or "Nesetat"}</b></p><p>Latitudine: {p.latitude or "—"} · Longitudine: {p.longitude or "—"}</p>'));b=QPushButton('Deschide profilul operatorului');b.clicked.connect(self.open_operator_profile);l.addWidget(b);l.addStretch()
+ def _settings(self):
+  l=QVBoxLayout(self.settings)
+  for text,fn in [('Date operator',self.open_operator_profile),('Administrează repetoare',self.open_repeaters),('Setări propagare',self.open_propagation_settings),('Creează backup',self.backup)]:b=QPushButton(text);b.clicked.connect(fn);l.addWidget(b)
+  l.addStretch()
+ def filters(self):return {k:e.text() for k,e in self.filters_edits.items()}
+ def refresh(self):
+  rows=self.db.list_qsos(self.filters());self.table.setRowCount(len(rows))
+  for i,r in enumerate(rows):
+   dt=r['qso_start_utc'];vals=(r['id'],dt[:10],dt[11:19],r['callsign'],r['operator_name'],r['frequency_mhz'],r['band'],r['mode'],r['repeater_name'] or '',r['rst_sent'],r['rst_received'],r['qsl_status'])
+   for j,v in enumerate(vals):self.table.setItem(i,j,QTableWidgetItem(str(v)))
+  self.status.setText(f'{len(rows)} QSO-uri afișate.')
+ def current_id(self):
+  rows=self.table.selectionModel().selectedRows();return int(self.table.item(rows[0].row(),0).text()) if rows else None
+ def edit(self):
+  if (i:=self.current_id()) is not None:self.form.load(self.db.get_qso(i));self.tabs.setCurrentWidget(self.log)
+ def cancel_edit(self):self.form.new();self.table.clearSelection();self.status.setText('Gata pentru un QSO nou.')
+ def save(self):
+  try:
+   _,editing=self.controller.save_qso(self.form.value(),lambda _:QMessageBox.question(self,'Posibil duplicat','Există un QSO similar. Salvați?')==QMessageBox.StandardButton.Yes);self.refresh();self.cancel_edit();self.status.setText('QSO actualizat.' if editing else 'QSO salvat.')
+  except DuplicateQsoCancelled:pass
+  except (ValueError,OSError,KeyError) as e:QMessageBox.critical(self,'Eroare',str(e))
+ def delete(self):
+  if (i:=self.current_id()) is not None and QMessageBox.question(self,'Confirmare','Ștergeți QSO-ul?')==QMessageBox.StandardButton.Yes:self.db.delete_qso(i);self.refresh();self.cancel_edit()
+ def propagation_context_changed(self,band,freq):self.propagation_panel.schedule(band)
+ def open_operator_profile(self):d=OperatorProfileWindow(self,self.db);d.exec();self.operator_profile=self.db.get_operator_profile()
+ def open_repeaters(self):d=RepeaterWindow(self,self.db,self.form.refresh_repeaters);d.exec()
+ def open_propagation_settings(self):
+  d=QDialog(self);l=QFormLayout(d);enabled=QCheckBox('Actualizare automată');interval=QComboBox();interval.addItems(('10','15','30','60'));enabled.setChecked(self.app_config.get('propagation_auto_refresh_minutes','15') in PROPAGATION_REFRESH_INTERVALS);l.addRow(enabled);l.addRow('Interval (minute)',interval);b=QPushButton('Salvează');b.clicked.connect(lambda:(self.app_config.__setitem__('propagation_auto_refresh_minutes',interval.currentText() if enabled.isChecked() else '0'),save_config(self.app_config),d.accept()));l.addRow(b);d.exec()
+ def _export(self,title,extension,exporter):
+  name,_=QFileDialog.getSaveFileName(self,f'Export {title}','exports',f'{title} (*{extension})')
+  if name:
+   try:self.status.setText(f'Export creat: {exporter(self.controller.list_qsos(self.filters()),Path(name))}')
+   except Exception as e:QMessageBox.critical(self,'Eroare export',str(e))
+ def excel(self):self._export('Excel','.xlsx',self.controller.export_excel)
+ def adif(self):self._export('ADIF','.adi',self.controller.export_adif)
+ def backup(self):
+  try:self.status.setText(f'Backup creat: {self.controller.create_backup()}')
+  except Exception as e:QMessageBox.critical(self,'Eroare backup',str(e))
+ def _clock(self):self.clock.setText(f'Local {datetime.now():%H:%M:%S}  |  UTC {datetime.now(timezone.utc):%H:%M:%S}')
+ def closeEvent(self,event):self.propagation_panel.shutdown();event.accept()
