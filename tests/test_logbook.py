@@ -1,4 +1,5 @@
 import tempfile, unittest
+from unittest import mock
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from models import OperatorProfile, QSO, Repeater
@@ -8,6 +9,7 @@ from database import Database
 from adif_export import adif_record
 from utils.maidenhead import coordinates_to_maidenhead, maidenhead_to_coordinates
 from services.location_service import LocationService, LocationUnavailableError, LocationTimeoutError
+from ui.main_window import MainWindow
 class LogbookTests(unittest.TestCase):
  def qso(self,**changes):
   values=dict(callsign="yo3abc/p",qso_start_utc="2026-01-01T12:00:00+00:00",qso_end_utc="2026-01-01T12:01:00+00:00",frequency_mhz=145.5,mode="FM")
@@ -58,4 +60,45 @@ class LogbookTests(unittest.TestCase):
    with self.assertRaises(LocationUnavailableError): LocationService().locate()
   with mock.patch("services.location_service.sys.platform","win32"),mock.patch("services.location_service.subprocess.run",side_effect=__import__('subprocess').TimeoutExpired("powershell",12)):
    with self.assertRaises(LocationTimeoutError): LocationService().locate()
+
+class MainWindowLogicTests(unittest.TestCase):
+ def test_toggle_search_panel_preserves_filter_values(self):
+  window=MainWindow.__new__(MainWindow)
+  window.search_panel_visible=False
+  window.search_panel=mock.Mock(); window.form=mock.sentinel.form
+  window.search_toggle_button=mock.Mock(); window.search_entry=mock.Mock()
+  window.search=mock.Mock(); window.search.get.return_value="YO3ABC"
+  MainWindow.toggle_search_panel(window)
+  self.assertTrue(window.search_panel_visible)
+  window.search_panel.pack.assert_called_once_with(fill="x",padx=8,before=window.form)
+  window.search_entry.focus_set.assert_called_once()
+  MainWindow.toggle_search_panel(window)
+  self.assertFalse(window.search_panel_visible)
+  window.search_panel.pack_forget.assert_called_once()
+  self.assertEqual(window.search.get(),"YO3ABC")
+
+ def test_ctrl_f_displays_hidden_panel_and_focuses_search(self):
+  window=MainWindow.__new__(MainWindow)
+  window.search_panel_visible=False; window.toggle_search_panel=mock.Mock()
+  self.assertEqual(MainWindow.focus_search(window),"break")
+  window.toggle_search_panel.assert_called_once()
+
+ def test_menu_commands_reuse_existing_action_callbacks(self):
+  class FakeMenu:
+   instances=[]
+   def __init__(self,*args,**kwargs): self.items=[]; FakeMenu.instances.append(self)
+   def add_command(self,**kwargs): self.items.append(("command",kwargs))
+   def add_separator(self): self.items.append(("separator",{}))
+   def add_cascade(self,**kwargs): self.items.append(("cascade",kwargs))
+  window=MainWindow.__new__(MainWindow)
+  window.excel=mock.Mock(); window.adif=mock.Mock(); window.backup=mock.Mock()
+  window.close_application=mock.Mock(); window.open_operator_profile=mock.Mock(); window.open_repeaters=mock.Mock(); window.config=mock.Mock()
+  with mock.patch("ui.main_window.tk.Menu",FakeMenu): MainWindow.create_menu_bar(window)
+  file_menu,settings_menu=FakeMenu.instances[1:]
+  for _,item in file_menu.items:
+   if item.get("label") in {"Exportă Excel","Exportă ADIF","Creează backup"}: item["command"]()
+  for _,item in settings_menu.items:
+   if item.get("label") in {"Date operator","Repetoare"}: item["command"]()
+  window.excel.assert_called_once(); window.adif.assert_called_once(); window.backup.assert_called_once()
+  window.open_operator_profile.assert_called_once(); window.open_repeaters.assert_called_once()
 if __name__ == "__main__":unittest.main()
