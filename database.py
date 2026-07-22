@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS stations (id INTEGER PRIMARY KEY AUTOINCREMENT,name T
   with self.connect() as c:
    c.execute("""CREATE TABLE IF NOT EXISTS operator_profile (id INTEGER PRIMARY KEY CHECK (id = 1), callsign TEXT NOT NULL DEFAULT '', full_name TEXT NOT NULL DEFAULT '', maidenhead_locator TEXT NOT NULL DEFAULT '', locality TEXT NOT NULL DEFAULT '', county TEXT NOT NULL DEFAULT '', country TEXT NOT NULL DEFAULT '', address TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', phone TEXT NOT NULL DEFAULT '', radio_equipment TEXT NOT NULL DEFAULT '', antenna TEXT NOT NULL DEFAULT '', default_power_w REAL, radio_club TEXT NOT NULL DEFAULT '', club_callsign TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '')""")
    self._add_missing_columns(c, "operator_profile", {"callsign":"TEXT NOT NULL DEFAULT ''", "full_name":"TEXT NOT NULL DEFAULT ''", "maidenhead_locator":"TEXT NOT NULL DEFAULT ''", "locality":"TEXT NOT NULL DEFAULT ''", "county":"TEXT NOT NULL DEFAULT ''", "country":"TEXT NOT NULL DEFAULT ''", "address":"TEXT NOT NULL DEFAULT ''", "email":"TEXT NOT NULL DEFAULT ''", "phone":"TEXT NOT NULL DEFAULT ''", "radio_equipment":"TEXT NOT NULL DEFAULT ''", "antenna":"TEXT NOT NULL DEFAULT ''", "default_power_w":"REAL", "radio_club":"TEXT NOT NULL DEFAULT ''", "club_callsign":"TEXT NOT NULL DEFAULT ''", "notes":"TEXT NOT NULL DEFAULT ''", "latitude":"REAL", "longitude":"REAL", "location_accuracy_m":"REAL", "location_source":"TEXT", "location_updated_at":"TEXT", "grid_square":"TEXT"})
-   self._add_missing_columns(c, "qsos", {"my_grid_square":"TEXT"})
+   self._add_missing_columns(c, "qsos", {"my_grid_square":"TEXT", "propagation_mode":"TEXT NOT NULL DEFAULT 'Necunoscută'", "satellite_name":"TEXT", "uplink_mode":"TEXT", "downlink_mode":"TEXT", "distance_km":"REAL", "azimuth_deg":"REAL", "propagation_notes":"TEXT"})
  def _add_missing_columns(self, connection, table, columns):
   """Safely migrate old local databases without rebuilding any table."""
   existing={row["name"] for row in connection.execute(f"PRAGMA table_info({table})")}
@@ -37,10 +37,10 @@ CREATE TABLE IF NOT EXISTS stations (id INTEGER PRIMARY KEY AUTOINCREMENT,name T
   assignments=", ".join(f"{field}=excluded.{field}" for field in fields)
   with self.connect() as c:c.execute(f"INSERT INTO operator_profile (id,{','.join(fields)}) VALUES ({','.join('?'*(len(fields)+1))}) ON CONFLICT(id) DO UPDATE SET {assignments}",[1,*values])
  def save_qso(self,q:QSO)->int:
-  fields="callsign,qso_start_utc,qso_end_utc,frequency_mhz,band,mode,repeater_id,rst_sent,rst_received,operator_name,grid_square,my_grid_square,power_w,notes,qsl_status"; vals=[getattr(q,x) for x in fields.split(",")]; now=datetime.now(timezone.utc).isoformat()
+  fields="callsign,qso_start_utc,qso_end_utc,frequency_mhz,band,mode,repeater_id,rst_sent,rst_received,operator_name,grid_square,my_grid_square,power_w,notes,qsl_status,propagation_mode,satellite_name,uplink_mode,downlink_mode,distance_km,azimuth_deg,propagation_notes"; vals=[getattr(q,x) for x in fields.split(",")]; now=datetime.now(timezone.utc).isoformat()
   with self.connect() as c:
    if q.id: c.execute(f"UPDATE qsos SET {','.join(f'{x}=?' for x in fields.split(','))},updated_at=? WHERE id=?",vals+[now,q.id]); return q.id
-   cur=c.execute(f"INSERT INTO qsos ({fields},created_at) VALUES ({','.join('?'*16)})",vals+[now]); return cur.lastrowid
+   cur=c.execute(f"INSERT INTO qsos ({fields},created_at) VALUES ({','.join('?'*(len(vals)+1))})",vals+[now]); return cur.lastrowid
  def get_qso(self,id:int)->QSO: return QSO(**dict(self._one("SELECT * FROM qsos WHERE id=?",(id,))))
  def list_qsos(self, filters:dict[str,str]|None=None)->list[sqlite3.Row]:
   filters=filters or {}; where=[]; values=[]

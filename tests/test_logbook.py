@@ -7,6 +7,7 @@ from validators import (band_for_frequency, format_name_input, normalize_callsig
                         normalize_name, parse_positive, validate_callsign, validate_qso)
 from database import Database
 from adif_export import adif_record
+from excel_export import export_excel, HEADERS
 from utils.maidenhead import coordinates_to_maidenhead, maidenhead_to_coordinates
 from services.location_service import LocationService, LocationUnavailableError, LocationTimeoutError
 from ui.main_window import MainWindow
@@ -30,6 +31,24 @@ class LogbookTests(unittest.TestCase):
  def test_crud_and_duplicate(self):
   with tempfile.TemporaryDirectory() as tmp:
    db=Database(Path(tmp)/"test.db");q=validate_qso(self.qso());ident=db.save_qso(q);self.assertEqual(db.get_qso(ident).callsign,"YO3ABC/P");self.assertTrue(db.possible_duplicate(q));q.id=ident;q.notes="edited";db.save_qso(q);self.assertEqual(db.get_qso(ident).notes,"edited");r=Repeater("R0",145.6);rid=db.save_repeater(r);q.repeater_id=rid;db.save_qso(q);db.delete_repeater(rid);self.assertIsNone(db.get_qso(ident).repeater_id);db.delete_qso(ident);self.assertEqual(db.list_qsos(),[])
+ def test_propagation_crud_and_delete(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   db=Database(Path(tmp)/"test.db"); q=validate_qso(self.qso(propagation_mode="Satelit",satellite_name="QO-100",uplink_mode="SSB",downlink_mode="SSB",distance_km=35786.5,azimuth_deg=180,propagation_notes="QSB")); ident=db.save_qso(q)
+   saved=db.get_qso(ident);self.assertEqual((saved.satellite_name,saved.distance_km,saved.azimuth_deg),("QO-100",35786.5,180))
+   saved.propagation_notes="edited";db.save_qso(saved);self.assertEqual(db.get_qso(ident).propagation_notes,"edited")
+   db.delete_qso(ident)
+   with self.assertRaises(KeyError): db.get_qso(ident)
+ def test_propagation_validation(self):
+  with self.assertRaises(ValueError): validate_qso(self.qso(distance_km=0))
+  with self.assertRaises(ValueError): validate_qso(self.qso(azimuth_deg=361))
+  with self.assertRaises(ValueError): validate_qso(self.qso(propagation_mode="Satelit"))
+  self.assertEqual(validate_qso(self.qso(propagation_mode="Satelit",satellite_name="QO-100",uplink_mode="SSB",downlink_mode="SSB")).satellite_name,"QO-100")
+ def test_propagation_exports(self):
+  q=validate_qso(self.qso(propagation_mode="Satelit",satellite_name="QO-100",uplink_mode="SSB",downlink_mode="USB",distance_km=35786.5,azimuth_deg=145,propagation_notes="Deschidere excelentă"))
+  record=adif_record(q);self.assertIn("<PROP_MODE:3>SAT",record);self.assertIn("<SAT_NAME:6>QO-100",record);self.assertIn("<SAT_MODE:7>SSB/USB",record);self.assertIn("<DISTANCE:7>35786.5",record);self.assertIn("Deschidere excelentă",record)
+  with tempfile.TemporaryDirectory() as tmp:
+   from openpyxl import load_workbook
+   path=export_excel([q],destination=Path(tmp)/"qsos.xlsx");ws=load_workbook(path).active;self.assertEqual(ws[1][13].value,"Propagare");self.assertEqual(ws[2][13].value,"Satelit");self.assertEqual(ws[2][18].value,145)
  def test_operator_profile_save_and_load(self):
   with tempfile.TemporaryDirectory() as tmp:
    db=Database(Path(tmp)/"test.db");profile=OperatorProfile(callsign="YO3ABC",full_name="Ion Popescu",default_power_w=25.0,radio_club="Radio Club")
@@ -43,6 +62,13 @@ class LogbookTests(unittest.TestCase):
    c=sqlite3.connect(path); c.execute("CREATE TABLE operator_profile (id INTEGER PRIMARY KEY, callsign TEXT)"); c.execute("INSERT INTO operator_profile VALUES (1,'YO3OLD')"); c.commit(); c.close()
    db=Database(path); self.assertEqual(db.get_operator_profile().callsign,"YO3OLD")
    with db.connect() as c:self.assertIn("latitude",[r["name"] for r in c.execute("PRAGMA table_info(operator_profile)")])
+ def test_qso_propagation_migration(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   path=Path(tmp)/"old.db"; import sqlite3
+   c=sqlite3.connect(path);c.execute("CREATE TABLE qsos (id INTEGER PRIMARY KEY, callsign TEXT NOT NULL, qso_start_utc TEXT NOT NULL, frequency_mhz REAL NOT NULL, mode TEXT NOT NULL)");c.commit();c.close()
+   db=Database(path)
+   with db.connect() as c: columns={r["name"] for r in c.execute("PRAGMA table_info(qsos)")}
+   self.assertTrue({"propagation_mode","satellite_name","uplink_mode","downlink_mode","distance_km","azimuth_deg","propagation_notes"} <= columns)
  def test_maidenhead_precisions_and_hemispheres(self):
   self.assertEqual(coordinates_to_maidenhead(44.4268,26.1025,4),"KN34")
   self.assertEqual(coordinates_to_maidenhead(44.4268,26.1025,6),"KN34bk")
