@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 PROPAGATION_MODES = (
-    "Necunoscută", "Directă", "Repeater", "Satelit", "EME (Moonbounce)",
+    "Necunoscută", "Directă", "Repeater", "Satelit", "Ground Wave", "Tropospheric", "EME (Moonbounce)",
     "Meteor Scatter", "Troposcatter", "Tropospheric Ducting", "Sporadic-E",
     "F2", "Aurora", "Aurora-E", "NVIS", "Backscatter", "Aircraft Scatter",
     "Rain Scatter", "Ionoscatter", "MSK144", "QO-100", "Internet Gateway",
