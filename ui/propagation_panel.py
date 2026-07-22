@@ -1,4 +1,4 @@
-"""Compact Tk presentation for NOAA space-weather and HF conditions."""
+"""Compact Tk presentation for multi-provider space-weather conditions."""
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
@@ -34,19 +34,19 @@ class PropagationPanel(ttk.LabelFrame):
 
         top = ttk.Frame(self)
         top.pack(fill="x")
-        self.status = tk.StringVar(value="Selectează o bandă pentru actualizarea datelor NOAA.")
+        self.status = tk.StringVar(value="Selectează o bandă pentru actualizarea datelor disponibile.")
         ttk.Label(top, textvariable=self.status).pack(side="left")
         self.refresh_button = ttk.Button(top, text="Actualizează", command=lambda: self.refresh(force=True))
         self.refresh_button.pack(side="right")
-        Tooltip(self.refresh_button, "Descarcă cele mai recente date NOAA SWPC și actualizează tabelul fără a recrea panoul.")
+        Tooltip(self.refresh_button, "Descarcă date din sursele disponibile și actualizează tabelul fără a recrea panoul.")
 
         weather_frame = ttk.LabelFrame(self, text="Space Weather", padding=6)
         weather_frame.pack(fill="x", pady=(8, 4))
         self.updated = tk.StringVar(value="—")
-        self.source = tk.StringVar(value="NOAA SWPC")
+        self.source = tk.StringVar(value="—")
         self._metric_values = {name: tk.StringVar(value="—") for name in (
             "SFI", "SSN", "K Index", "A Index", "X-Ray Flux", "Proton Flux",
-            "Electron Flux", "Auroral Activity", "Bz", "Solar Wind", "Densitate particule",
+            "Electron Flux", "Auroral Activity", "Bz", "Bt", "Solar Wind", "Densitate particule", "Temperatură vânt", "Ap",
         )}
         self._add_pair(weather_frame, 0, "Actualizat (UTC)", self.updated)
         self._add_pair(weather_frame, 1, "Sursă", self.source)
@@ -115,7 +115,7 @@ class PropagationPanel(ttk.LabelFrame):
     def _start(self, request_id: int, force: bool) -> None:
         if self.closing or request_id != self.request_id:
             return
-        self.status.set("Se descarcă date NOAA SWPC…")
+        self.status.set("Se descarcă date din sursele disponibile…")
         self.refresh_button.config(state="disabled")
         future = self.executor.submit(SpaceWeatherService().fetch, force)
         future.add_done_callback(lambda result: self.after(0, lambda: self._finish(request_id, result)))
@@ -133,7 +133,7 @@ class PropagationPanel(ttk.LabelFrame):
     def update_values(self, weather: SpaceWeatherData) -> None:
         """Apply a successful result in place and retain it for future failures."""
         self.updated.set(weather.observed_at_utc.astimezone(timezone.utc).strftime("%d-%m-%Y %H:%M UTC"))
-        self.source.set(weather.source or "NOAA SWPC")
+        self.source.set(weather.source or "—")
         values = {
             "SFI": weather.solar_flux,
             "SSN": weather.sunspot_number,
@@ -144,11 +144,16 @@ class PropagationPanel(ttk.LabelFrame):
             "Electron Flux": weather.electron_flux,
             "Auroral Activity": weather.auroral_activity,
             "Bz": weather.bz,
+            "Bt": weather.bt,
             "Solar Wind": weather.solar_wind_speed,
             "Densitate particule": weather.solar_wind_density,
+            "Temperatură vânt": weather.solar_wind_temperature,
+            "Ap": weather.ap_index,
         }
         for name, value in values.items():
-            self._metric_values[name].set(self._format_value(value))
+            key = {"SFI":"solar_flux", "SSN":"sunspot_number", "K Index":"kp_index", "A Index":"a_index", "X-Ray Flux":"xray_flux", "Proton Flux":"proton_flux", "Electron Flux":"electron_flux", "Auroral Activity":"auroral_activity", "Bz":"bz", "Bt":"bt", "Solar Wind":"solar_wind_speed", "Densitate particule":"solar_wind_density", "Temperatură vânt":"solar_wind_temperature", "Ap":"ap_index"}[name]
+            measurement = weather.measurement(key)
+            self._metric_values[name].set(self._format_measurement(value, measurement.unit if measurement else "", measurement.source if measurement else "—", measurement.age_seconds if measurement else None))
         self._geomagnetic.set(
             f"Aurora: {self._format_value(weather.auroral_activity)}%    "
             f"Bz: {self._format_value(weather.bz)} nT    "
@@ -165,8 +170,15 @@ class PropagationPanel(ttk.LabelFrame):
     @staticmethod
     def _format_value(value: float | str | None) -> str:
         if value is None:
-            return "Unavailable"
+            return "N/A"
         return f"{value:g}" if isinstance(value, float) else str(value)
+
+    @classmethod
+    def _format_measurement(cls, value: float | str | None, unit: str, source: str, age_seconds: int | None) -> str:
+        if value is None:
+            return "N/A (fără sursă validă)"
+        age = "?" if age_seconds is None else (f"{age_seconds // 60} min" if age_seconds < 3600 else f"{age_seconds // 3600} h")
+        return f"{cls._format_value(value)} {unit} [{source}, {age}]".strip()
 
     def shutdown(self) -> None:
         self.closing = True
