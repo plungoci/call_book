@@ -9,6 +9,7 @@ from services.propagation_cache import PropagationCache
 from services.propagation_map_service import PropagationMapService, evaluate_band_conditions
 from services.space_weather_service import (InternetConnectionError, NOAA_ENDPOINTS,
     SpaceWeatherError, SpaceWeatherService, check_internet_connection)
+from ui.propagation_map_panel import PropagationMapPanel
 
 class WeatherTests(unittest.TestCase):
  def test_noaa_values_are_parsed_from_mocked_json(self):
@@ -47,4 +48,7 @@ class MapTests(unittest.TestCase):
  def test_cache_key_is_stable(self):
   self.assertEqual(PropagationCache.key({"band":"20m"}),PropagationCache.key({"band":"20m"}))
   self.assertNotEqual(PropagationCache.key({"band":"20m"}),PropagationCache.key({"band":"40m"}))
+ def test_map_display_size_is_contained_and_proportional(self):
+  self.assertEqual(PropagationMapPanel._fit_size(960,460,1200),(816,391))
+  self.assertEqual(PropagationMapPanel._fit_size(960,460,600),(408,196))
 if __name__ == '__main__':unittest.main()
