@@ -108,3 +108,15 @@ data/ exports/ backups/ date runtime
 ## Limitări și extensii
 
 Interfața necesită un calculator cu server grafic pentru verificare vizuală. În medii headless se verifică importurile și logica independentă de UI, fără a porni o buclă Tkinter persistentă. Nu sunt implementate QRZ, LoTW/eQSL, CAT, cloud, hărți, autentificare sau o aplicație web; modulele actuale permit adăugarea lor ulterioară fără a amesteca UI cu persistenta.
+
+## Hartă de propagare (estimare locală)
+
+Zona liberă a ferestrei principale conține **Hartă propagare**. Este în mod explicit o **estimare de propagare**, nu o măsurătoare şi nu garantează o legătură. După schimbarea benzii (inclusiv detectarea din frecvenţă sau selectarea repetorului), actualizarea este debounced cu 700 ms şi rulează într-un fir separat; rezultatele vechi sunt ignorate. Butonul **Actualizează** reface estimarea, iar **Vizualizare → Hartă propagare** o ascunde pentru ecrane mici.
+
+Aplicaţia descarcă exclusiv JSON public HTTPS de la NOAA SWPC: `planetary_k_index_1m.json`, `f107_cm_flux.json`, `predicted_f107_cm_flux.json`, `wing_kp_1m.json` şi `alerts.json`. Sunt folosite SFI/F10.7, Kp, A (dacă endpointul îl oferă), numărul petelor (dacă este prezent) şi alertele de blackout. NOAA primeşte numai cereri pentru date globale: nu sunt trimise indicativul, numele, adresa sau coordonatele. Harta PNG se generează local din poziţia deja configurată a operatorului; coordonatele exacte nu sunt tipărite şi nu sunt puse în loguri.
+
+Pentru HF (160–10 m), euristica locală combină momentul UTC/zi-noapte aproximativă, SFI, Kp, A şi blackout în clasele **Foarte slabă**, **Slabă**, **Moderată**, **Bună**, **Foarte bună**; nu este VOACAP. Pentru 6 m se afişează o hartă orientativă şi avertismentul că Sporadic-E nu poate fi confirmat doar prin indicii solari. Pentru VHF/UHF şi microunde se trasează numai o zonă locală line-of-sight orientativă, fără predicţie HF, troposferică, aurorală, rain/aircraft scatter sau poziţii inventate de repetor.
+
+Datele meteo spaţiale şi hărţile sunt păstrate local în `cache/space_weather/` şi `cache/propagation_maps/` pentru 15 minute, cu eliminarea fişierelor vechi. Dacă internetul cade, harta afişată nu este ştearsă; dacă există cache valid este folosit, altfel apare un mesaj şi formularul QSO rămâne utilizabil. Actualizarea automată este activă implicit la 15 minute; în `config.json` se poate seta `propagation_auto_refresh_minutes` la `10`, `15`, `30`, `60` sau o valoare diferită pentru dezactivare, iar `show_propagation_map` controlează vizibilitatea.
+
+Nu au fost introduse dependenţe noi: clientul NOAA foloseşte `urllib` din biblioteca standard, iar rendererul generează PNG local compatibil cu `tk.PhotoImage`, astfel încât testele nu cer display. Pe un laptop Windows real verificaţi Tkinter pentru Python 3.12–3.14, scalarea DPI, afişarea PNG, conectivitatea TLS către NOAA, actualizarea în fundal şi închiderea aplicaţiei în timpul unei cereri.
