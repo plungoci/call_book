@@ -42,9 +42,15 @@ La prima pornire se creează `data/logbook.db` și `config.json`. Datele persona
 
 Toate orele formularului și ale bazei de date sunt UTC; antetul afișează simultan timpul local și UTC. **QSO nou** sau `Ctrl+N` resetează formularul. `Ctrl+S` salvează, `Ctrl+F` focalizează căutarea, `Delete` șterge QSO-ul selectat după confirmare, iar `Escape` anulează editarea. Repetoarele pot completa frecvența, modul și banda, dar aceste valori rămân editabile.
 
-### Profil operator
+### Profil operator și localizare Maidenhead
 
 Deschide **Setări → Date operator** (sau butonul **Date operator**) pentru a completa indicativul, numele, locatorul, localitatea, județul, țara, datele de contact, stația, antena, puterea implicită, clubul și observațiile. **Salvează** persistă profilul, iar **Resetează** îl golește numai după confirmare.
+
+Formularul include și **Latitudine**, **Longitudine**, **Precizie localizare**, **Sursa localizării** și **Locator Maidenhead**. Pe Windows, activează mai întâi **Setări Windows → Confidențialitate și securitate → Locație**, apoi apasă **Detectează locația**. Aplicația execută o singură cerere explicită către API-ul local Windows Location (nu urmărește poziția în fundal) și completează câmpurile cu sursa și precizia raportate de sistem. Dacă locatorul salvat diferă, aplicația cere confirmare înainte de înlocuire. Poți introduce manual coordonatele pe orice platformă și apăsa **Recalculează locatorul**.
+
+Coordonatele, sursa, precizia și momentul actualizării sunt păstrate numai local în SQLite, în profilul operatorului. Nu sunt trimise prin internet, nu sunt trimise la servicii de localizare IP, nu sunt scrise în logurile tehnice și nu sunt exportate ca latitudine/longitudine brută. Locatorul operatorului este exportat ADIF ca `MY_GRIDSQUARE` (iar indicativul ca `STATION_CALLSIGN`); locatorul corespondentului rămâne `GRIDSQUARE`. QSO-urile noi rețin o copie a locatorului propriu pentru acuratețe istorică.
+
+Pe laptopuri fără GPS, Windows poate estima poziția din Wi-Fi, rețea sau alte surse disponibile sistemului; precizia poate fi redusă. Un laptop fără senzori sau cu serviciile de localizare dezactivate poate necesita introducerea manuală. Verificarea reală a Windows Location trebuie făcută pe un laptop Windows cu serviciile active; testele automate folosesc mock-uri și nu solicită poziția sistemului.
 
 ### Editarea și ștergerea QSO-urilor
 
@@ -63,6 +69,8 @@ main.py                 pornire
 models.py               modele de date
 database.py             acces SQLite parametrizat
 validators.py           validare și benzi
+utils/maidenhead.py     conversie locală coordonate/locator
+services/location_service.py API Windows Location izolat de interfață
 adif_export.py          export ADIF
 excel_export.py         export Excel
 backup.py               backup SQLite
