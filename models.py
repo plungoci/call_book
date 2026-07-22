@@ -10,6 +10,7 @@ class QSO:
     repeater_id: Optional[int] = None; rst_sent: str = ""; rst_received: str = ""
     operator_name: str = ""; grid_square: str = ""; power_w: Optional[float] = None
     notes: str = ""; qsl_status: str = "NOT_SENT"; created_at: str = ""; updated_at: Optional[str] = None
+    my_grid_square: str = ""
 
 @dataclass(slots=True)
 class Repeater:
@@ -37,3 +38,9 @@ class OperatorProfile:
     radio_club: str = ""
     club_callsign: str = ""
     notes: str = ""
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    location_accuracy_m: Optional[float] = None
+    location_source: str = ""
+    location_updated_at: str = ""
+    grid_square: str = ""

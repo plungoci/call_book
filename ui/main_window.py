@@ -144,6 +144,9 @@ class MainWindow(tk.Tk):
     def save(self) -> None:
         try:
             qso = self.form.value()
+            if qso.id is None:
+                # Snapshot the operator's locator for historical ADIF accuracy.
+                qso.my_grid_square = self.db.get_operator_profile().grid_square
             qso.qso_end_utc = qso.qso_end_utc or datetime.now(timezone.utc).replace(microsecond=0).isoformat()
             validate_qso(qso)
             if self.db.possible_duplicate(qso) and not messagebox.askyesno("Posibil duplicat", "Există un QSO similar în ±2 minute. Salvați totuși?"):
@@ -181,7 +184,7 @@ class MainWindow(tk.Tk):
         OperatorProfileWindow(self, self.db)
 
     def adif(self) -> None:
-        self._export("ADIF", ".adi", [("ADIF", "*.adi")], export_adif)
+        self._export("ADIF", ".adi", [("ADIF", "*.adi")], lambda qsos, destination: export_adif(qsos, destination=destination, profile=self.db.get_operator_profile()))
 
     def excel(self) -> None:
         self._export("Excel", ".xlsx", [("Excel", "*.xlsx")], export_excel)
