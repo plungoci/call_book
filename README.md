@@ -112,7 +112,7 @@ Fereastra principală conține un panou compact **Condiții de propagare**, nu o
 
 ### Furnizori și produse
 
-* **NOAA SWPC** — JSON HTTPS public: `planetary_k_index_1m.json` (Kp și A), `solar-cycle/observed-solar-cycle-indices.json` (F10.7 și SSN), produsele GOES X-ray/protoni/electroni, `rtsw_plasma_1_hour.json` (viteză, densitate, temperatură), `rtsw_mag_1_hour.json` (Bz/Bt), OVATION (probabilitate aurorală) și alertele R. Sunt produse globale, în principal minute/oră sau cele mai recente valori disponibile; pot întârzia, pot lipsi și nu reprezintă măsurători locale.
+* **NOAA SWPC** — JSON HTTPS public: `planetary_k_index_1m.json` (Kp și A), `solar-cycle/observed-solar-cycle-indices.json` (F10.7 și SSN), produsele GOES X-ray/protoni/electroni, `rtsw_wind_1m.json` (viteză, densitate, temperatură), `rtsw_mag_1m.json` (Bz/Bt), OVATION (probabilitate aurorală) și alertele R. Sunt produse globale, în principal minute/oră sau cele mai recente valori disponibile; pot întârzia, pot lipsi și nu reprezintă măsurători locale.
 * **SIDC/SILSO** — `https://www.sidc.be/SILSO/INFO/sndtotcsv.php`, CSV separat prin `;`, fără parametri. Se folosește ultimul *daily total sunspot number* valid (`count`), actualizat zilnic. Este preferat pentru SSN; nu este un flux în timp real.
 * **GFZ Potsdam** — `https://kp.gfz-potsdam.de/app/files/Kp_ap_nowcast.txt`, text whitespace-delimited, fără parametri. Se citesc ultima pereche Kp/Ap nowcast validă (indici Kp și Ap, fără unitate fizică); cadența este de ordinul ferestrelor de 3 ore, iar valorile nowcast pot fi revizuite.
 

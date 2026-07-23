@@ -87,13 +87,31 @@ class PropagationEstimatorTests(TestCase):
             self.assertEqual((weather.solar_wind_speed, weather.solar_wind_density, weather.bz), (410, 5.2, -2.1))
             self.assertEqual((weather.solar_wind_temperature, weather.bt), (125000, 6.3))
 
+    def test_noaa_wind_endpoints_use_published_one_minute_and_two_hour_feeds(self) -> None:
+        self.assertEqual(
+            NOAA_ENDPOINTS["plasma"],
+            "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json",
+        )
+        self.assertEqual(
+            NOAA_ENDPOINTS["magnetic"],
+            "https://services.swpc.noaa.gov/json/rtsw/rtsw_mag_1m.json",
+        )
+        self.assertEqual(
+            NOAA_FALLBACK_ENDPOINTS["plasma"],
+            "https://services.swpc.noaa.gov/products/solar-wind/plasma-2-hour.json",
+        )
+        self.assertEqual(
+            NOAA_FALLBACK_ENDPOINTS["magnetic"],
+            "https://services.swpc.noaa.gov/products/solar-wind/mag-2-hour.json",
+        )
+
     def test_swpc_header_table_and_field_aliases_use_latest_valid_reading(self) -> None:
         rows = [["time_tag", "proton_density", "solar_wind_speed", "temperature"], ["2026-07-22T11:00:00Z", None, "bad", "-1"], ["2026-07-22T12:00:00Z", "4.6", "503", "142000"]]
         self.assertEqual(_latest(rows, ("density", "proton_density")), 4.6)
         self.assertEqual(_latest(rows, ("speed", "solar_wind_speed")), 503)
         self.assertEqual(_latest(rows, ("temperature",)), 142000)
 
-    def test_noaa_seven_day_feed_is_used_when_one_hour_feed_has_no_values(self) -> None:
+    def test_noaa_two_hour_feed_is_used_when_real_time_feed_has_no_values(self) -> None:
         with TemporaryDirectory() as directory:
             service = SpaceWeatherService(PropagationCache(Path(directory)))
             products = {
