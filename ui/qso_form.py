@@ -125,6 +125,11 @@ class QSOForm(QGroupBox):
         )
         self._line("frequency_mhz").textChanged.connect(self._frequency_changed)
         self._line("band").textChanged.connect(self._context)
+        # Populate the editable combobox during form construction as well as
+        # after repeater management changes.  Previously it was refreshed only
+        # after closing the management dialog, so repeaters already stored in
+        # the database were absent when the application first opened.
+        self.refresh_repeaters()
         self.new()
 
     def _create_widget(self, key):

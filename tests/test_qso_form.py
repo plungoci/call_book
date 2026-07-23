@@ -77,6 +77,23 @@ class QSOFormTests(unittest.TestCase):
         self.form.new()
         self.assertEqual(self.form.text("callsign"), "")
 
+    def test_repeater_dropdown_is_populated_on_form_creation(self):
+        repeaters = lambda: [{
+            "id": 12,
+            "name": "YO3RPT",
+            "output_frequency_mhz": 145.675,
+            "mode": "C4FM",
+        }]
+        form = QSOForm(repeaters)
+
+        repeater = form.fields["repeater"]
+        self.assertEqual(repeater.count(), 2)
+        self.assertEqual(repeater.itemText(1), "12 — YO3RPT")
+
+        repeater.setCurrentIndex(1)
+        self.assertEqual(form.text("frequency_mhz"), "145.675")
+        self.assertEqual(form.text("mode"), "C4FM")
+
     def test_loaded_callsign_can_be_edited_and_saved(self):
         with tempfile.TemporaryDirectory() as directory:
             database = Database(Path(directory) / "logbook.db")
