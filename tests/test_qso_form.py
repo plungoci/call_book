@@ -77,6 +77,13 @@ class QSOFormTests(unittest.TestCase):
         self.form.new()
         self.assertEqual(self.form.text("callsign"), "")
 
+    def test_new_qso_keeps_the_previously_selected_propagation_mode(self):
+        self.form.set_text("propagation_mode", "Satelit")
+
+        self.form.new()
+
+        self.assertEqual(self.form.text("propagation_mode"), "Satelit")
+
     def test_optional_groups_are_hidden_until_their_checkboxes_are_selected(self):
         report_check = self.form.optional_group_checks["Raport și confirmare"]
         route_check = self.form.optional_group_checks["Timp și traseu"]
