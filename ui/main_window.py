@@ -20,7 +20,7 @@ class MainWindow(QMainWindow):
   for title,fn in [('Exportă Excel',self.excel),('Exportă ADIF',self.adif),('Creează backup',self.backup),('Ieșire',self.close)]:file.addAction(QAction(title,self,triggered=fn))
   settings=self.menuBar().addMenu('Setări');settings.addAction('Date operator',self.open_operator_profile);settings.addAction('Repetoare',self.open_repeaters);settings.addAction('Setări propagare',self.open_propagation_settings)
  def _build(self):
-  central=QWidget();self.setCentralWidget(central);root=QVBoxLayout(central);bar=QHBoxLayout();bar.addWidget(QLabel('<h2>Radio Logbook</h2>'));bar.addWidget(QLabel('Jurnal radioamator · operare locală'));bar.addStretch();self.clock=QLabel();bar.addWidget(self.clock);root.addLayout(bar);self.tabs=QTabWidget();root.addWidget(self.tabs);self.log=QWidget();self.propagation_tab=QWidget();self.location=QWidget();self.settings=QWidget();self.tabs.addTab(self.log,'Jurnal QSO');self.tabs.addTab(self.propagation_tab,'Propagare');self.tabs.addTab(self.location,'Locație');self.tabs.addTab(self.settings,'Setări');self._log();self._propagation();self._location();self._settings();self.status=QLabel('Gata pentru un QSO nou.');root.addWidget(self.status)
+  central=QWidget();self.setCentralWidget(central);root=QVBoxLayout(central);bar=QHBoxLayout();bar.addWidget(QLabel('<h2>Radio Logbook</h2>'));self.station_locator=QLabel();bar.addWidget(self.station_locator);self._update_station_locator();bar.addWidget(QLabel('Jurnal radioamator · operare locală'));bar.addStretch();self.clock=QLabel();bar.addWidget(self.clock);root.addLayout(bar);self.tabs=QTabWidget();root.addWidget(self.tabs);self.log=QWidget();self.propagation_tab=QWidget();self.location=QWidget();self.settings=QWidget();self.tabs.addTab(self.log,'Jurnal QSO');self.tabs.addTab(self.propagation_tab,'Propagare');self.tabs.addTab(self.location,'Locație');self.tabs.addTab(self.settings,'Setări');self._log();self._propagation();self._location();self._settings();self.status=QLabel('Gata pentru un QSO nou.');root.addWidget(self.status)
  def _log(self):
   l=QVBoxLayout(self.log); self.filters_edits={};filters=QHBoxLayout()
   for key,label in [('callsign','Indicativ'),('band','Bandă'),('mode','Mod'),('repeater_id','Repetor ID'),('date_from','De la'),('date_to','Până la')]: e=QLineEdit();e.setPlaceholderText(label);filters.addWidget(e);self.filters_edits[key]=e
@@ -54,7 +54,11 @@ class MainWindow(QMainWindow):
  def delete(self):
   if (i:=self.current_id()) is not None and QMessageBox.question(self,'Confirmare','Ștergeți QSO-ul?')==QMessageBox.StandardButton.Yes:self.db.delete_qso(i);self.refresh();self.cancel_edit()
  def propagation_context_changed(self,band,freq):self.propagation_panel.schedule(band)
- def open_operator_profile(self):d=OperatorProfileWindow(self,self.db);d.exec();self.operator_profile=self.db.get_operator_profile()
+ def _update_station_locator(self):
+  locator=self.operator_profile.grid_square or self.operator_profile.maidenhead_locator
+  self.station_locator.setText(f'<h2>{locator}</h2>' if locator else '')
+ def open_operator_profile(self):
+  d=OperatorProfileWindow(self,self.db);d.exec();self.operator_profile=self.db.get_operator_profile();self._update_station_locator()
  def open_repeaters(self):d=RepeaterWindow(self,self.db,self.form.refresh_repeaters);d.exec()
  def open_propagation_settings(self):
   d=QDialog(self);l=QFormLayout(d);enabled=QCheckBox('Actualizare automată');interval=QComboBox();interval.addItems(('10','15','30','60'));enabled.setChecked(self.app_config.get('propagation_auto_refresh_minutes','15') in PROPAGATION_REFRESH_INTERVALS);l.addRow(enabled);l.addRow('Interval (minute)',interval);b=QPushButton('Salvează');b.clicked.connect(lambda:(self.app_config.__setitem__('propagation_auto_refresh_minutes',interval.currentText() if enabled.isChecked() else '0'),save_config(self.app_config),d.accept()));l.addRow(b);d.exec()
