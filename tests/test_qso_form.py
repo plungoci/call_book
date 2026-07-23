@@ -71,6 +71,19 @@ class QSOFormTests(unittest.TestCase):
         self.assertEqual(operator_name.text(), "Ion Popescu")
         self.assertEqual(operator_name.cursorPosition(), 4)
 
+    def test_grid_square_is_always_capitalized(self):
+        grid_square = self.form.fields["grid_square"]
+        grid_square.setText("kn34bk")
+        grid_square.setCursorPosition(4)
+        grid_square.textEdited.emit(grid_square.text())
+
+        self.assertEqual(grid_square.text(), "KN34BK")
+        self.assertEqual(grid_square.cursorPosition(), 4)
+
+        self.form.set_text("grid_square", "jo62qn")
+        self.assertEqual(grid_square.text(), "JO62QN")
+        self.assertEqual(self.form.value().grid_square, "JO62QN")
+
     def test_callsign_can_be_loaded_serialized_and_cleared(self):
         qso = QSO(
             id=7,
