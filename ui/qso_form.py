@@ -19,7 +19,7 @@ from models import QSO
 from propagation import PROPAGATION_MODES
 from services.band_detector import BandDetector
 from services.propagation_service import PROPAGATION_UNKNOWN
-from utils.text_formatters import format_callsign, format_operator_name
+from utils.text_formatters import format_callsign, format_grid_square, format_operator_name
 
 
 MODES = (
@@ -134,6 +134,9 @@ class QSOForm(QGroupBox):
         self._line("callsign").textEdited.connect(
             lambda text: self._format_live_input("callsign", format_callsign, text)
         )
+        self._line("grid_square").textEdited.connect(
+            lambda text: self._format_live_input("grid_square", format_grid_square, text)
+        )
         self._line("operator_name").textEdited.connect(
             lambda text: self._format_live_input("operator_name", format_operator_name, text)
         )
@@ -176,6 +179,11 @@ class QSOForm(QGroupBox):
                 "Introdu indicativul stației corespondente. Literele sunt "
                 "transformate automat în majuscule."
             )
+        if key == "grid_square":
+            return (
+                "Introdu locatorul Maidenhead. Literele sunt transformate "
+                "automat în majuscule."
+            )
         return f"Valoarea {label_text.lower()} pentru acest QSO."
 
     def _line(self, key):
@@ -190,7 +198,8 @@ class QSOForm(QGroupBox):
         if isinstance(widget, QComboBox):
             widget.setCurrentText(str(value))
         else:
-            widget.setText(str(value))
+            formatter = format_grid_square if key == "grid_square" else str
+            widget.setText(formatter(str(value)))
 
     def _format_live_input(self, key, formatter, value):
         """Format a user edit without moving the insertion cursor.
@@ -287,7 +296,7 @@ class QSOForm(QGroupBox):
             mode=text("mode"),
             rst_sent=text("rst_sent"),
             rst_received=text("rst_received"),
-            grid_square=text("grid_square"),
+            grid_square=text("grid_square").upper(),
             power_w=float(text("power_w")) if text("power_w") else None,
             qsl_status=text("qsl_status"),
             qso_start_utc=text("qso_start_utc"),

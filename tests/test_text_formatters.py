@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import unittest
 
-from utils.text_formatters import format_callsign, format_operator_name
+from utils.text_formatters import format_callsign, format_grid_square, format_operator_name
 
 
 class TextFormatterTests(unittest.TestCase):
@@ -12,6 +12,10 @@ class TextFormatterTests(unittest.TestCase):
         self.assertEqual(format_callsign("yr5d/p"), "YR5D/P")
         self.assertEqual(format_callsign("yo8abc/mm"), "YO8ABC/MM")
         self.assertEqual(format_callsign("yo-8abc/p"), "YO-8ABC/P")
+
+    def test_format_grid_square_uppercases_letters(self):
+        self.assertEqual(format_grid_square("kn34bk"), "KN34BK")
+        self.assertEqual(format_grid_square("jo62qn12"), "JO62QN12")
 
     def test_format_operator_name_uses_title_case(self):
         cases = {
