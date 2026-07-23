@@ -77,6 +77,36 @@ class QSOFormTests(unittest.TestCase):
         self.form.new()
         self.assertEqual(self.form.text("callsign"), "")
 
+    def test_optional_groups_are_hidden_until_their_checkboxes_are_selected(self):
+        report_check = self.form.optional_group_checks["Raport și confirmare"]
+        route_check = self.form.optional_group_checks["Timp și traseu"]
+
+        self.assertFalse(report_check.isChecked())
+        self.assertTrue(self.form.optional_group_boxes["Raport și confirmare"].isHidden())
+        self.assertFalse(route_check.isChecked())
+        self.assertTrue(self.form.optional_group_boxes["Timp și traseu"].isHidden())
+
+        report_check.setChecked(True)
+        route_check.setChecked(True)
+
+        self.assertFalse(self.form.optional_group_boxes["Raport și confirmare"].isHidden())
+        self.assertFalse(self.form.optional_group_boxes["Timp și traseu"].isHidden())
+
+    def test_loading_a_qso_keeps_optional_groups_hidden(self):
+        qso = QSO(
+            id=7,
+            callsign="YO3ABC",
+            frequency_mhz=145.5,
+            mode="FM",
+            qso_start_utc="2026-01-01T12:00:00+00:00",
+            rst_sent="59",
+        )
+
+        self.form.load(qso)
+
+        self.assertFalse(self.form.optional_group_checks["Raport și confirmare"].isChecked())
+        self.assertFalse(self.form.optional_group_checks["Timp și traseu"].isChecked())
+
     def test_repeater_dropdown_is_populated_on_form_creation(self):
         repeaters = lambda: [{
             "id": 12,

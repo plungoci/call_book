@@ -47,6 +47,8 @@ La prima pornire se creează `data/logbook.db` și `config.json`. Datele persona
 
 Toate orele formularului și ale bazei de date sunt UTC; antetul afișează simultan timpul local și UTC. **QSO nou** sau `Ctrl+N` resetează formularul. `Ctrl+S` salvează, `Ctrl+F` deschide și focalizează căutarea, `Delete` șterge QSO-ul selectat după confirmare, iar `Escape` anulează editarea. Repetoarele pot completa frecvența, modul și banda, dar aceste valori rămân editabile.
 
+În formularul QSO, bifează **Raport și confirmare** sau **Timp și traseu** pentru a afișa câmpurile din aceste secțiuni. Secțiunile sunt ascunse implicit, astfel încât interfața rămâne simplă când nu ai nevoie de ele.
+
 ### Meniul Fișier
 
 Acțiunile care produc fișiere sunt grupate în **Fișier**: **Exportă Excel**, **Exportă ADIF** și **Creează backup**. Exporturile păstrează aceleași formate și alegerea destinației, iar backupul SQLite este creat în `backups/`. Comanda **Ieșire** închide în siguranță aplicația și ferestrele secundare deschise.
