@@ -242,6 +242,9 @@ class QSOForm(QGroupBox):
         widget.blockSignals(False)
 
     def new(self):
+        # Keep the propagation mode from the previous QSO.  Operators commonly
+        # log several consecutive contacts using the same propagation path.
+        previous_propagation_mode = self.text("propagation_mode") or PROPAGATION_UNKNOWN
         self._loading = True
         self.qso_id = None
         for title in OPTIONAL_GROUPS:
@@ -251,7 +254,7 @@ class QSOForm(QGroupBox):
         self.set_text("qso_start_utc", datetime.now(timezone.utc).replace(microsecond=0).isoformat())
         self.set_text("mode", "FM")
         self.set_text("qsl_status", "NOT_SENT")
-        self.set_text("propagation_mode", PROPAGATION_UNKNOWN)
+        self.set_text("propagation_mode", previous_propagation_mode)
         self.set_text("power_w", "" if self.default_power_w is None else f"{self.default_power_w:g}")
         self.notes.clear()
         self._loading = False
