@@ -25,16 +25,18 @@ NOAA_ENDPOINTS = {
     "kp": "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json", "solar": "https://services.swpc.noaa.gov/json/solar-cycle/observed-solar-cycle-indices.json",
     "xray": "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json", "proton": "https://services.swpc.noaa.gov/json/goes/primary/integral-protons-3-day.json",
     "electron": "https://services.swpc.noaa.gov/json/goes/primary/integral-electrons-3-day.json",
-    # SWPC moved the real-time wind feeds from /json/rtsw/ to products/solar-wind/.
-    # These feeds are a JSON table (header row followed by value rows), not objects.
-    "plasma": "https://services.swpc.noaa.gov/products/solar-wind/plasma-1-hour.json",
-    "magnetic": "https://services.swpc.noaa.gov/products/solar-wind/mag-1-hour.json",
+    # The current RT SWPC feeds are one-minute JSON object arrays.  The old
+    # rtsw_*_1_hour and products/*-1-hour names return 404.
+    "plasma": "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json",
+    "magnetic": "https://services.swpc.noaa.gov/json/rtsw/rtsw_mag_1m.json",
     "aurora": "https://services.swpc.noaa.gov/json/ovation_aurora_latest.json", "alerts": "https://services.swpc.noaa.gov/products/alerts.json",
 }
 NOAA_FALLBACK_ENDPOINTS = {
     "kp": "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json",
-    "plasma": "https://services.swpc.noaa.gov/products/solar-wind/plasma-7-day.json",
-    "magnetic": "https://services.swpc.noaa.gov/products/solar-wind/mag-7-day.json",
+    # Keep a separately published, short-history product as a fallback for
+    # temporary gaps in the real-time feeds.
+    "plasma": "https://services.swpc.noaa.gov/products/solar-wind/plasma-2-hour.json",
+    "magnetic": "https://services.swpc.noaa.gov/products/solar-wind/mag-2-hour.json",
     "aurora": "https://services.swpc.noaa.gov/products/aurora-30-minute-forecast.json",
 }
 SILSO_ENDPOINT = "https://www.sidc.be/SILSO/INFO/sndtotcsv.php"
