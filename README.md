@@ -1,6 +1,6 @@
 # Radio Logbook
 <p align="center">
-  <img src="preview.png" alt="GUI" width="69%">
+  <img src="preview.png" alt="GUI" width="100%">
 </p>
 Aplicație desktop locală/offline pentru evidența legăturilor radioamatorice (QSO). Datele sunt păstrate în SQLite, iar Excel este utilizat numai pentru export.
 
