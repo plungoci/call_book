@@ -71,3 +71,7 @@ CREATE TABLE IF NOT EXISTS stations (id INTEGER PRIMARY KEY AUTOINCREMENT,name T
  def delete_repeater(self,id:int):
   # ON DELETE SET NULL deliberately retains historic QSO records.
   with self.connect() as c:c.execute("DELETE FROM repeaters WHERE id=?",(id,))
+ def reset_id_sequences(self)->None:
+  """Reset SQLite ID counters without changing the records already stored."""
+  with self.connect() as c:
+   c.execute("DELETE FROM sqlite_sequence WHERE name IN ('qsos','repeaters','stations')")

@@ -18,7 +18,7 @@ class MainWindow(QMainWindow):
  def _menu(self):
   file=self.menuBar().addMenu('Fișier');
   for title,fn in [('Exportă Excel',self.excel),('Exportă ADIF',self.adif),('Creează backup',self.backup),('Ieșire',self.close)]:file.addAction(QAction(title,self,triggered=fn))
-  settings=self.menuBar().addMenu('Setări');settings.addAction('Date operator',self.open_operator_profile);settings.addAction('Repetoare',self.open_repeaters);settings.addAction('Setări propagare',self.open_propagation_settings)
+  settings=self.menuBar().addMenu('Setări');settings.addAction('Date operator',self.open_operator_profile);settings.addAction('Repetoare',self.open_repeaters);settings.addAction('Setări propagare',self.open_propagation_settings);settings.addSeparator();settings.addAction('Resetează numerotarea ID-urilor',self.reset_id_sequences)
  def _build(self):
   central=QWidget();self.setCentralWidget(central);root=QVBoxLayout(central);bar=QHBoxLayout();bar.addWidget(QLabel('<h2>Radio Logbook</h2>'));self.station_locator=QLabel();bar.addWidget(self.station_locator);self._update_station_locator();bar.addStretch();self.clock=QLabel();bar.addWidget(self.clock);root.addLayout(bar);self.tabs=QTabWidget();root.addWidget(self.tabs);self.log=QWidget();self.propagation_tab=QWidget();self.location=QWidget();self.settings=QWidget();self.tabs.addTab(self.log,'Jurnal QSO');self.tabs.addTab(self.propagation_tab,'Propagare');self.tabs.addTab(self.location,'Locație');self.tabs.addTab(self.settings,'Setări');self._log();self._propagation();self._location();self._settings();self.status=QLabel('Gata pentru un QSO nou.');root.addWidget(self.status)
  def _log(self):
@@ -32,7 +32,7 @@ class MainWindow(QMainWindow):
   l=QVBoxLayout(self.location);p=self.operator_profile;l.addWidget(QLabel(f'<h2>Poziția stației</h2><p>Locator: <b>{p.grid_square or p.maidenhead_locator or "Nesetat"}</b></p><p>Latitudine: {p.latitude or "—"} · Longitudine: {p.longitude or "—"}</p>'));b=QPushButton('Deschide profilul operatorului');b.clicked.connect(self.open_operator_profile);l.addWidget(b);l.addStretch()
  def _settings(self):
   l=QVBoxLayout(self.settings)
-  for text,fn in [('Date operator',self.open_operator_profile),('Administrează repetoare',self.open_repeaters),('Setări propagare',self.open_propagation_settings),('Creează backup',self.backup)]:b=QPushButton(text);b.clicked.connect(fn);l.addWidget(b)
+  for text,fn in [('Date operator',self.open_operator_profile),('Administrează repetoare',self.open_repeaters),('Setări propagare',self.open_propagation_settings),('Creează backup',self.backup),('Resetează numerotarea ID-urilor',self.reset_id_sequences)]:b=QPushButton(text);b.clicked.connect(fn);l.addWidget(b)
   l.addStretch()
  def filters(self):return {k:e.text() for k,e in self.filters_edits.items()}
  def refresh(self):
@@ -72,5 +72,11 @@ class MainWindow(QMainWindow):
  def backup(self):
   try:self.status.setText(f'Backup creat: {self.controller.create_backup()}')
   except Exception as e:QMessageBox.critical(self,'Eroare backup',str(e))
+ def reset_id_sequences(self):
+  message=('Resetați numerotarea ID-urilor pentru QSO-uri, repetoare și stații?\n\n'
+           'Datele existente nu vor fi șterse. Următorul ID va urma cel mai mare ID existent.')
+  if QMessageBox.question(self,'Confirmare resetare ID-uri',message)==QMessageBox.StandardButton.Yes:
+   try:self.db.reset_id_sequences();self.status.setText('Numerotarea ID-urilor a fost resetată.')
+   except OSError as e:QMessageBox.critical(self,'Eroare',str(e))
  def _clock(self):self.clock.setText(f'Local {datetime.now():%H:%M:%S}  |  UTC {datetime.now(timezone.utc):%H:%M:%S}')
  def closeEvent(self,event):self.propagation_panel.shutdown();event.accept()
