@@ -32,11 +32,11 @@ Linux/macOS:
 ```bash
 source .venv/bin/activate
 ```
-
+Install requirements
 ```bash
 pip install -r requirements.txt
 ```
-
+Start
 ```bash
 python main.py
 ```
