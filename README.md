@@ -55,7 +55,7 @@ Acțiunile care produc fișiere sunt grupate în **Fișier**: **Exportă Excel**
 
 ### Meniul Setări
 
-**Setări → Date operator** deschide profilul operatorului, iar **Setări → Repetoare** deschide administrarea repetoarelor. Dacă una dintre aceste ferestre este deja deschisă, aplicația o aduce în față în loc să creeze un duplicat.
+**Setări → Date operator** deschide profilul operatorului, iar **Setări → Repetoare** deschide administrarea repetoarelor. **Setări → Resetează numerotarea ID-urilor** cere confirmare și resetează contoarele SQLite pentru QSO-uri, repetoare și stații, fără să șteargă datele; următorul ID va fi 1 dacă tabelul este gol sau îl va urma pe cel mai mare ID existent. Dacă una dintre aceste ferestre este deja deschisă, aplicația o aduce în față în loc să creeze un duplicat.
 
 ### Căutare și filtrare
 

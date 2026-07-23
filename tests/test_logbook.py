@@ -32,6 +32,16 @@ class LogbookTests(unittest.TestCase):
  def test_crud_and_duplicate(self):
   with tempfile.TemporaryDirectory() as tmp:
    db=Database(Path(tmp)/"test.db");q=validate_qso(self.qso());ident=db.save_qso(q);self.assertEqual(db.get_qso(ident).callsign,"YO3ABC/P");self.assertTrue(db.possible_duplicate(q));q.id=ident;q.notes="edited";db.save_qso(q);self.assertEqual(db.get_qso(ident).notes,"edited");r=Repeater("R0",145.6);rid=db.save_repeater(r);q.repeater_id=rid;db.save_qso(q);db.delete_repeater(rid);self.assertIsNone(db.get_qso(ident).repeater_id);db.delete_qso(ident);self.assertEqual(db.list_qsos(),[])
+ def test_reset_id_sequences_starts_empty_tables_at_one(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   db=Database(Path(tmp)/"test.db");q=validate_qso(self.qso());ident=db.save_qso(q);db.delete_qso(ident)
+   db.reset_id_sequences()
+   self.assertEqual(db.save_qso(q),1)
+ def test_reset_id_sequences_preserves_existing_records(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   db=Database(Path(tmp)/"test.db");first=db.save_qso(validate_qso(self.qso()));second=db.save_qso(validate_qso(self.qso(qso_start_utc="2026-01-02T12:00:00+00:00")))
+   db.delete_qso(second);db.reset_id_sequences()
+   self.assertEqual(db.save_qso(validate_qso(self.qso(qso_start_utc="2026-01-03T12:00:00+00:00"))),first+1)
  def test_propagation_crud_and_delete(self):
   with tempfile.TemporaryDirectory() as tmp:
    db=Database(Path(tmp)/"test.db"); q=validate_qso(self.qso(propagation_mode="Satelit",satellite_name="QO-100",uplink_mode="SSB",downlink_mode="SSB",distance_km=35786.5,azimuth_deg=180,propagation_notes="QSB")); ident=db.save_qso(q)
