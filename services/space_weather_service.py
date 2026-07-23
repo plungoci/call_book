@@ -25,19 +25,15 @@ NOAA_ENDPOINTS = {
     "kp": "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json", "solar": "https://services.swpc.noaa.gov/json/solar-cycle/observed-solar-cycle-indices.json",
     "xray": "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json", "proton": "https://services.swpc.noaa.gov/json/goes/primary/integral-protons-3-day.json",
     "electron": "https://services.swpc.noaa.gov/json/goes/primary/integral-electrons-3-day.json",
-    # The current RT SWPC feeds are one-minute JSON object arrays.  The old
-    # rtsw_*_1_hour and products/*-1-hour names return 404.
-    "plasma": "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json",
-    "magnetic": "https://services.swpc.noaa.gov/json/rtsw/rtsw_mag_1m.json",
+    # The rolling seven-day products retain minute resolution while bounding
+    # the response.  The rtsw_* feeds grow without a fixed history window and
+    # eventually exceed the client's safe response limit.
+    "plasma": "https://services.swpc.noaa.gov/products/solar-wind/plasma-7-day.json",
+    "magnetic": "https://services.swpc.noaa.gov/products/solar-wind/mag-7-day.json",
     "aurora": "https://services.swpc.noaa.gov/json/ovation_aurora_latest.json", "alerts": "https://services.swpc.noaa.gov/products/alerts.json",
 }
 NOAA_FALLBACK_ENDPOINTS = {
     "kp": "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json",
-    # Keep a separately published, short-history product as a fallback for
-    # temporary gaps in the real-time feeds.
-    "plasma": "https://services.swpc.noaa.gov/products/solar-wind/plasma-2-hour.json",
-    "magnetic": "https://services.swpc.noaa.gov/products/solar-wind/mag-2-hour.json",
-    "aurora": "https://services.swpc.noaa.gov/products/aurora-30-minute-forecast.json",
 }
 SILSO_ENDPOINT = "https://www.sidc.be/SILSO/INFO/sndtotcsv.php"
 GFZ_ENDPOINT = "https://kp.gfz-potsdam.de/app/files/Kp_ap_nowcast.txt"
@@ -163,11 +159,11 @@ class SpaceWeatherService:
         }
         for name, field_sets in requirements.items():
             if any(_latest(payloads.get(name), fields) is None for fields in field_sets):
+                fallback_url = NOAA_FALLBACK_ENDPOINTS.get(name)
+                if fallback_url is None:
+                    continue
                 try: payloads[f"{name}_fallback"] = self._get(NOAA_FALLBACK_ENDPOINTS[name])
                 except SpaceWeatherError as exc: LOG.warning("NOAA fallback %s indisponibil: %s", name, exc)
-        if _aurora_probability(payloads.get("aurora")) is None:
-            try: payloads["aurora_fallback"] = self._get(NOAA_FALLBACK_ENDPOINTS["aurora"])
-            except SpaceWeatherError as exc: LOG.warning("NOAA fallback aurora indisponibil: %s", exc)
 
         def pick(metric: str, product: str, fields: tuple[str, ...]) -> float | None:
             value, used = _latest_from(payloads, (product, f"{product}_fallback"), fields)
@@ -177,8 +173,8 @@ class SpaceWeatherService:
             return value
 
         aurora = _aurora_probability(payloads.get("aurora"))
-        if aurora is None: aurora = _aurora_probability(payloads.get("aurora_fallback"))
-        if aurora is not None: self._noaa_sources["auroral_activity"] = "NOAA SWPC" if "aurora" in payloads and _aurora_probability(payloads["aurora"]) is not None else "NOAA SWPC (fallback)"
+        if aurora is not None:
+            self._noaa_sources["auroral_activity"] = "NOAA SWPC"
         result = {
             "kp_index": pick("kp_index", "kp", ("kp_index", "kp")), "a_index": pick("a_index", "kp", ("a_running", "a_index", "a")),
             "solar_flux": pick("solar_flux", "solar", ("f10.7", "f107", "flux")), "sunspot_number": pick("sunspot_number", "solar", ("ssn", "sunspot_number")),

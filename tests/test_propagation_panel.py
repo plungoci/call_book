@@ -87,23 +87,18 @@ class PropagationEstimatorTests(TestCase):
             self.assertEqual((weather.solar_wind_speed, weather.solar_wind_density, weather.bz), (410, 5.2, -2.1))
             self.assertEqual((weather.solar_wind_temperature, weather.bt), (125000, 6.3))
 
-    def test_noaa_wind_endpoints_use_published_one_minute_and_two_hour_feeds(self) -> None:
+    def test_noaa_wind_endpoints_use_bounded_published_seven_day_feeds(self) -> None:
         self.assertEqual(
             NOAA_ENDPOINTS["plasma"],
-            "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json",
+            "https://services.swpc.noaa.gov/products/solar-wind/plasma-7-day.json",
         )
         self.assertEqual(
             NOAA_ENDPOINTS["magnetic"],
-            "https://services.swpc.noaa.gov/json/rtsw/rtsw_mag_1m.json",
+            "https://services.swpc.noaa.gov/products/solar-wind/mag-7-day.json",
         )
-        self.assertEqual(
-            NOAA_FALLBACK_ENDPOINTS["plasma"],
-            "https://services.swpc.noaa.gov/products/solar-wind/plasma-2-hour.json",
-        )
-        self.assertEqual(
-            NOAA_FALLBACK_ENDPOINTS["magnetic"],
-            "https://services.swpc.noaa.gov/products/solar-wind/mag-2-hour.json",
-        )
+        self.assertNotIn("plasma", NOAA_FALLBACK_ENDPOINTS)
+        self.assertNotIn("magnetic", NOAA_FALLBACK_ENDPOINTS)
+        self.assertNotIn("aurora", NOAA_FALLBACK_ENDPOINTS)
 
     def test_swpc_header_table_and_field_aliases_use_latest_valid_reading(self) -> None:
         rows = [["time_tag", "proton_density", "solar_wind_speed", "temperature"], ["2026-07-22T11:00:00Z", None, "bad", "-1"], ["2026-07-22T12:00:00Z", "4.6", "503", "142000"]]
@@ -111,14 +106,14 @@ class PropagationEstimatorTests(TestCase):
         self.assertEqual(_latest(rows, ("speed", "solar_wind_speed")), 503)
         self.assertEqual(_latest(rows, ("temperature",)), 142000)
 
-    def test_noaa_two_hour_feed_is_used_when_real_time_feed_has_no_values(self) -> None:
+    def test_missing_wind_values_do_not_request_retired_fallback_feeds(self) -> None:
         with TemporaryDirectory() as directory:
             service = SpaceWeatherService(PropagationCache(Path(directory)))
             products = {
+                NOAA_ENDPOINTS["solar"]: [{"f10.7": "145"}],
                 NOAA_ENDPOINTS["plasma"]: [["time_tag", "density", "speed", "temperature"], ["2026-07-22T12:00:00Z", None, None, None]],
-                NOAA_FALLBACK_ENDPOINTS["plasma"]: [["time_tag", "density", "speed", "temperature"], ["2026-07-22T11:00:00Z", "7", "444", "120000"]],
             }
             service._get = Mock(side_effect=lambda url, as_json=True: products.get(url, []))
             weather = service.fetch(force=True)
-            self.assertEqual((weather.solar_wind_speed, weather.solar_wind_density, weather.solar_wind_temperature), (444, 7, 120000))
-            self.assertEqual(weather.measurement("solar_wind_speed").source, "NOAA SWPC (fallback)")
+            self.assertEqual((weather.solar_wind_speed, weather.solar_wind_density, weather.solar_wind_temperature), (None, None, None))
+            self.assertNotIn("plasma-2-hour", " ".join(call.args[0] for call in service._get.call_args_list))
