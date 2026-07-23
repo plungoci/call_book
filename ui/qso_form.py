@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFormLayout,
     QGridLayout,
@@ -66,6 +67,7 @@ FIELD_GROUPS = (
         "downlink_mode", "distance_km", "azimuth_deg",
     )),
 )
+OPTIONAL_GROUPS = {"Raport și confirmare", "Timp și traseu"}
 FIELD_KEYS = tuple(key for _, keys in FIELD_GROUPS for key in keys)
 COMBO_BOX_FIELDS = {"repeater", "mode", "qsl_status", "propagation_mode"}
 
@@ -92,15 +94,26 @@ class QSOForm(QGroupBox):
         self.default_power_w = default_power_w
         self.qso_id = None
         self.fields = {}
+        self.optional_group_checks = {}
+        self.optional_group_boxes = {}
         self._loading = False
 
         layout = QVBoxLayout(self)
         grid = QGridLayout()
         layout.addLayout(grid)
         for column, (title, keys) in enumerate(FIELD_GROUPS):
-            box = QGroupBox(title)
+            box = QGroupBox()
             form = QFormLayout(box)
-            grid.addWidget(box, 0, column)
+            if title in OPTIONAL_GROUPS:
+                check = QCheckBox(title)
+                check.toggled.connect(box.setVisible)
+                layout.addWidget(check)
+                self.optional_group_checks[title] = check
+                self.optional_group_boxes[title] = box
+                box.setVisible(False)
+            else:
+                box.setTitle(title)
+                grid.addWidget(box, 0, column, 1, len(FIELD_GROUPS))
             for key in keys:
                 widget = self._create_widget(key)
                 # A missing translation must not prevent the logbook from
@@ -131,6 +144,14 @@ class QSOForm(QGroupBox):
         # the database were absent when the application first opened.
         self.refresh_repeaters()
         self.new()
+
+    def _set_optional_group_enabled(self, title, enabled):
+        """Show an optional field group without emitting checkbox signals."""
+        check = self.optional_group_checks[title]
+        check.blockSignals(True)
+        check.setChecked(enabled)
+        check.blockSignals(False)
+        self.optional_group_boxes[title].setVisible(enabled)
 
     def _create_widget(self, key):
         widget = QComboBox() if key in COMBO_BOX_FIELDS else QLineEdit()
@@ -223,6 +244,8 @@ class QSOForm(QGroupBox):
     def new(self):
         self._loading = True
         self.qso_id = None
+        for title in OPTIONAL_GROUPS:
+            self._set_optional_group_enabled(title, False)
         for key in self.fields:
             self.set_text(key, "")
         self.set_text("qso_start_utc", datetime.now(timezone.utc).replace(microsecond=0).isoformat())
@@ -237,6 +260,8 @@ class QSOForm(QGroupBox):
     def load(self, qso):
         self._loading = True
         self.qso_id = qso.id
+        for title in OPTIONAL_GROUPS:
+            self._set_optional_group_enabled(title, False)
         for key in self.fields:
             if key == "repeater":
                 self.set_text(key, f"{qso.repeater_id} —" if qso.repeater_id else "")
