@@ -56,11 +56,12 @@ LABELS = dict(FORM_FIELDS)
 
 FIELD_GROUPS = (
     ("Legătură", (
-        "callsign", "operator_name", "frequency_mhz", "band", "mode", "repeater",
+        "callsign", "operator_name", "grid_square", "frequency_mhz", "band", "mode",
+        "repeater",
         "propagation_mode",
     )),
     ("Raport și confirmare", (
-        "rst_sent", "rst_received", "power_w", "qsl_status", "grid_square",
+        "rst_sent", "rst_received", "power_w", "qsl_status",
     )),
     ("Timp și traseu", (
         "qso_start_utc", "qso_end_utc", "satellite_name", "uplink_mode",

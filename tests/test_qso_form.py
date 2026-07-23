@@ -17,7 +17,7 @@ if QApplication is not None:
     from database import Database
     from models import QSO
     from ui.main_window import MainWindow
-    from ui.qso_form import FIELD_KEYS, LABELS, QSOForm, validate_field_labels
+    from ui.qso_form import FIELD_GROUPS, FIELD_KEYS, LABELS, QSOForm, validate_field_labels
 
 
 @unittest.skipUnless(QApplication is not None, "PySide6 is required for Qt UI tests")
@@ -34,6 +34,15 @@ class QSOFormTests(unittest.TestCase):
         self.assertEqual(len(FIELD_KEYS), len(set(FIELD_KEYS)))
         self.assertEqual(set(FIELD_KEYS), set(LABELS))
         validate_field_labels()
+
+    def test_grid_square_is_in_connection_group_after_operator_name(self):
+        field_groups = dict(FIELD_GROUPS)
+
+        self.assertEqual(
+            field_groups["Legătură"].index("grid_square"),
+            field_groups["Legătură"].index("operator_name") + 1,
+        )
+        self.assertNotIn("grid_square", field_groups["Raport și confirmare"])
 
     def test_form_starts_when_a_field_translation_is_missing(self):
         """A translation mistake must not make the whole application unusable."""
