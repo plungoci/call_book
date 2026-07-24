@@ -27,11 +27,11 @@ class LogbookTests(unittest.TestCase):
  def test_bands(self):self.assertEqual(band_for_frequency(145.5),"2m");self.assertEqual(band_for_frequency(999),"Unknown")
  def test_time_interval(self):
   with self.assertRaises(ValueError):validate_qso(self.qso(qso_end_utc="2026-01-01T11:00:00+00:00"))
- def test_qso_table_dates_show_local_and_utc_dates(self):
-  local_date,utc_date,utc_time=qso_table_dates("2026-01-01T23:15:30+00:00")
+ def test_qso_table_dates_show_local_time_and_utc_values(self):
+  local_time,utc_date,utc_time=qso_table_dates("2026-01-01T23:15:30+00:00")
   self.assertEqual(utc_date,"2026-01-01")
   self.assertEqual(utc_time,"23:15:30")
-  self.assertEqual(local_date,datetime(2026,1,1,23,15,30,tzinfo=timezone.utc).astimezone().date().isoformat())
+  self.assertEqual(local_time,datetime(2026,1,1,23,15,30,tzinfo=timezone.utc).astimezone().strftime("%H:%M:%S"))
  def test_adif_byte_lengths(self):
   record=adif_record(validate_qso(self.qso(notes="ș")));self.assertIn("<COMMENT:2>ș",record);self.assertIn("<EOR>",record)
  def test_crud_and_duplicate(self):
