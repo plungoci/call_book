@@ -12,6 +12,14 @@ from .propagation_panel import PropagationPanel
 from .operator_profile_window import OperatorProfileWindow
 from .repeater_window import RepeaterWindow
 DARK='''QWidget{background:#171b22;color:#e6edf3;font:10pt "Segoe UI"} QLineEdit,QTextEdit,QComboBox,QTableWidget{background:#222833;border:1px solid #394454;border-radius:5px;padding:5px} QPushButton{background:#2f81f7;border:0;border-radius:5px;padding:7px 12px} QPushButton:disabled{background:#394454;color:#8b949e} QGroupBox{border:1px solid #394454;border-radius:7px;margin-top:10px;padding-top:8px;font-weight:bold} QTabBar::tab{padding:9px 18px;background:#222833} QHeaderView::section{background:#222833;padding:6px;border:0}'''
+
+
+def qso_table_dates(qso_start_utc):
+ """Return the local and UTC calendar dates for a QSO timestamp."""
+ utc_datetime=datetime.fromisoformat(qso_start_utc.replace('Z','+00:00')).astimezone(timezone.utc)
+ return utc_datetime.astimezone().date().isoformat(),utc_datetime.date().isoformat(),utc_datetime.strftime('%H:%M:%S')
+
+
 class MainWindow(QMainWindow):
  def __init__(self,db,config):
   super().__init__();self.db=db;self.app_config=config;self.controller=LogbookController(db);self.operator_profile=db.get_operator_profile();self.setWindowTitle('Radio Logbook');self.resize(1440,900);self.setMinimumSize(1024,700);self.setStyleSheet(DARK);self._menu();self._build();self.clock_timer=QTimer(self);self.clock_timer.timeout.connect(self._clock);self.clock_timer.start(1000);self._clock();self.refresh()
@@ -26,7 +34,7 @@ class MainWindow(QMainWindow):
   for key,label in [('callsign','Indicativ'),('band','Bandă'),('mode','Mod'),('repeater_id','Repetor ID'),('date_from','De la'),('date_to','Până la')]: e=QLineEdit();e.setPlaceholderText(label);filters.addWidget(e);self.filters_edits[key]=e
   b=QPushButton('Aplică filtre');b.clicked.connect(self.refresh);filters.addWidget(b);l.addLayout(filters);self.form=QSOForm(self.db.list_repeaters,self.operator_profile.default_power_w);self.form.contextChanged.connect(self.propagation_context_changed);l.addWidget(self.form);actions=QHBoxLayout()
   for name,fn in [('Salvează QSO',self.save),('QSO nou',self.cancel_edit),('Editează',self.edit),('Șterge',self.delete)]:b=QPushButton(name);b.clicked.connect(fn);actions.addWidget(b)
-  actions.addStretch();l.addLayout(actions);self.table=QTableWidget(0,12);self.table.setHorizontalHeaderLabels(('ID','Dată','Ora','Indicativ','Nume','MHz','Bandă','Mod','Repetor','RST T','RST R','QSL'));self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows);self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers);self.table.horizontalHeader().setStretchLastSection(True);l.addWidget(self.table)
+  actions.addStretch();l.addLayout(actions);self.table=QTableWidget(0,11);self.table.setHorizontalHeaderLabels(('ID','Dată locală','Dată UTC','Ora UTC','Indicativ','Nume','Grid Square','MHz','Bandă','Mod','Repetor'));self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows);self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers);self.table.horizontalHeader().setStretchLastSection(True);l.addWidget(self.table)
  def _propagation(self):l=QVBoxLayout(self.propagation_tab);self.propagation_panel=PropagationPanel();l.addWidget(self.propagation_panel)
  def _location(self):
   l=QVBoxLayout(self.location);p=self.operator_profile;l.addWidget(QLabel(f'<h2>Poziția stației</h2><p>Locator: <b>{p.grid_square or p.maidenhead_locator or "Nesetat"}</b></p><p>Latitudine: {p.latitude or "—"} · Longitudine: {p.longitude or "—"}</p>'));b=QPushButton('Deschide profilul operatorului');b.clicked.connect(self.open_operator_profile);l.addWidget(b);l.addStretch()
@@ -38,7 +46,7 @@ class MainWindow(QMainWindow):
  def refresh(self):
   rows=self.db.list_qsos(self.filters());self.table.setRowCount(len(rows))
   for i,r in enumerate(rows):
-   dt=r['qso_start_utc'];vals=(r['id'],dt[:10],dt[11:19],r['callsign'],r['operator_name'],r['frequency_mhz'],r['band'],r['mode'],r['repeater_name'] or '',r['rst_sent'],r['rst_received'],r['qsl_status'])
+   local_date,utc_date,utc_time=qso_table_dates(r['qso_start_utc']);vals=(r['id'],local_date,utc_date,utc_time,r['callsign'],r['operator_name'],r['grid_square'],r['frequency_mhz'],r['band'],r['mode'],r['repeater_name'] or '')
    for j,v in enumerate(vals):self.table.setItem(i,j,QTableWidgetItem(str(v)))
   self.status.setText(f'{len(rows)} QSO-uri afișate.')
  def current_id(self):
