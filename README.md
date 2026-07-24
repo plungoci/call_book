@@ -32,16 +32,24 @@ Linux/macOS:
 ```bash
 source .venv/bin/activate
 ```
-Install requirements
+Instalează dependențele:
 ```bash
-pip install -r requirements.txt
-```
-Start
-```bash
-python main.py
+python -m pip install -r requirements.txt
 ```
 
 La prima pornire se creează `data/logbook.db` și `config.json`. Datele personale ale operatorului sunt stocate separat, în tabelul SQLite `operator_profile`, astfel încât nu sunt pierdute la actualizările aplicației.
+
+## Pornirea și actualizarea aplicației
+
+Pornește întotdeauna aplicația prin lansator:
+
+```bash
+python launcher.py
+```
+
+Nu porni direct `python main.py`: `main.py` rămâne punctul de intrare PySide6, dar este pornit automat de lansator. La fiecare pornire, lansatorul verifică actualizările ramurii Git curente și aplică numai actualizări fast-forward. Dacă `requirements.txt` s-a schimbat, dependențele sunt instalate în același mediu Python.
+
+Pentru actualizare automată, Git trebuie să fie instalat, iar proiectul trebuie obținut cu `git clone`, nu descărcat ca arhivă ZIP. Dacă nu există conexiune sau verificarea actualizărilor eșuează, aplicația pornește în continuare cu versiunea locală. Modificările locale nu sunt șterse, puse în stash sau suprascrise automat; o actualizare care nu poate fi aplicată fast-forward este anulată.
 
 ## Utilizare
 
@@ -86,7 +94,8 @@ Exportul ADIF include `PROP_MODE` când există echivalent ADIF, `SAT_NAME`, `SA
 ## Structură
 
 ```text
-main.py                 pornire
+launcher.py             pornire și actualizare automată sigură
+main.py                 punct de intrare PySide6, pornit de launcher
 models.py               modele de date
 database.py             acces SQLite parametrizat
 validators.py           validare și benzi
