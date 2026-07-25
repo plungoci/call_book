@@ -11,6 +11,7 @@ from propagation_models import SpaceWeatherData
 from services.propagation_cache import PropagationCache
 from services.propagation_estimator import PropagationEstimator, evaluate_band_conditions
 from services.band_detector import BandDetector
+from validators import frequency_range_for_band
 from services.space_weather_service import (
     NOAA_ENDPOINTS, NOAA_FALLBACK_ENDPOINTS, SpaceWeatherError, SpaceWeatherService,
     _latest, parse_gfz_nowcast, parse_silso_daily_csv,
@@ -68,6 +69,14 @@ class PropagationEstimatorTests(TestCase):
         for frequency, band in cases:
             self.assertEqual(BandDetector.frequency_to_band(frequency), band)
         self.assertIsNone(BandDetector.frequency_to_band(999))
+
+    def test_frequency_ranges_are_available_for_propagation_bands(self) -> None:
+        expected_ranges = {
+            "80m": "3.5–4 MHz", "40m": "7–7.3 MHz", "20m": "14–14.35 MHz",
+            "15m": "21–21.45 MHz", "10m": "28–29.7 MHz",
+        }
+        for band, expected_range in expected_ranges.items():
+            self.assertEqual(frequency_range_for_band(band), expected_range)
 
     def test_parser_reads_each_noaa_product(self) -> None:
         with TemporaryDirectory() as directory:

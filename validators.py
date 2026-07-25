@@ -25,6 +25,12 @@ def parse_positive(value: str, label: str) -> float:
     return number
 def band_for_frequency(frequency: float) -> str:
     return next((band for low, high, band in BAND_RANGES if low <= frequency <= high), "Unknown")
+def frequency_range_for_band(band: str) -> str | None:
+    """Return the configured frequency range for ``band``, formatted in MHz."""
+    for low, high, candidate in BAND_RANGES:
+        if candidate == band:
+            return f"{low:g}–{high:g} MHz"
+    return None
 def parse_utc(value: str) -> datetime:
     result=datetime.fromisoformat(value.replace("Z", "+00:00"))
     if result.tzinfo is None: raise ValueError("Data/ora UTC trebuie să conțină fusul orar (+00:00).")
