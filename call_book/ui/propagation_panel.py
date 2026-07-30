@@ -70,12 +70,8 @@ class PropagationPanel(QGroupBox):
                 "X-Ray Flux",
                 "Proton Flux",
                 "Electron Flux",
-                "Auroral Activity",
                 "Bz",
-                "Bt",
                 "Solar Wind",
-                "Densitate",
-                "Temperatură",
                 "Ap",
             )
         ):
@@ -128,12 +124,8 @@ class PropagationPanel(QGroupBox):
             "X-Ray Flux": w.xray_flux,
             "Proton Flux": w.proton_flux,
             "Electron Flux": w.electron_flux,
-            "Auroral Activity": w.auroral_activity,
             "Bz": w.bz,
-            "Bt": w.bt,
             "Solar Wind": w.solar_wind_speed,
-            "Densitate": w.solar_wind_density,
-            "Temperatură": w.solar_wind_temperature,
             "Ap": w.ap_index,
         }
         for k, v in vals.items():

@@ -36,13 +36,9 @@ class SpaceWeatherData:
     xray_flux: float | None = None
     proton_flux: float | None = None
     electron_flux: float | None = None
-    auroral_activity: float | None = None
     solar_wind_speed: float | None = None
-    solar_wind_density: float | None = None
     bz: float | None = None
     ap_index: float | None = None
-    bt: float | None = None
-    solar_wind_temperature: float | None = None
     dynamic_pressure: float | None = None
     values: dict[str, WeatherValue] | None = None
     provider_status: dict[str, str] | None = None
