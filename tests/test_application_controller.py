@@ -1,20 +1,21 @@
 """Tests for UI-independent application use cases and configuration persistence."""
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from application_controller import DuplicateQsoCancelled, LogbookController
-from config import DEFAULT_CONFIG, load_config, save_config
-from database import Database
-from models import QSO
+from call_book.application_controller import DuplicateQsoCancelled, LogbookController
+from call_book.config import DEFAULT_CONFIG, load_config, save_config
+from call_book.database import Database
+from call_book.models import QSO
 
 
 class ApplicationControllerTests(TestCase):
     def _qso(self) -> QSO:
-        return QSO(callsign="yo3abc", qso_start_utc=datetime.now(timezone.utc).isoformat(), frequency_mhz=145.5, mode="FM")
+        return QSO(callsign="yo3abc", qso_start_utc=datetime.now(UTC).isoformat(), frequency_mhz=145.5, mode="FM")
 
     def test_save_normalizes_and_lists_qso_without_tk(self) -> None:
         with TemporaryDirectory() as directory:
@@ -28,7 +29,8 @@ class ApplicationControllerTests(TestCase):
         with TemporaryDirectory() as directory:
             controller = LogbookController(Database(Path(directory) / "logbook.db"))
             controller.save_qso(self._qso(), lambda _: True)
-            with self.assertRaises(DuplicateQsoCancelled): controller.save_qso(self._qso(), lambda _: False)
+            with self.assertRaises(DuplicateQsoCancelled):
+                controller.save_qso(self._qso(), lambda _: False)
 
     def test_config_write_round_trip_keeps_known_defaults(self) -> None:
         with TemporaryDirectory() as directory:

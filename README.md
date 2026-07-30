@@ -94,21 +94,26 @@ Exportul ADIF include `PROP_MODE` când există echivalent ADIF, `SAT_NAME`, `SA
 ## Structură
 
 ```text
-launcher.py             pornire și actualizare automată sigură
-main.py                 punct de intrare PySide6, pornit de launcher
-models.py               modele de date
-database.py             acces SQLite parametrizat
-validators.py           validare și benzi
-utils/maidenhead.py     conversie locală coordonate/locator
-services/location_service.py API Windows Location izolat de interfață
-services/propagation_service.py reguli testabile pentru sugestia implicită de propagare
-adif_export.py          export ADIF
-excel_export.py         export Excel
-backup.py               backup SQLite
-config.py               configurare JSON
-ui/                     interfața PySide6 / Qt for Python
-tests/                  teste unittest
-data/ exports/ backups/ date runtime
+launcher.py                      pornire și actualizare automată sigură
+main.py                          punct de intrare PySide6, pornit de launcher
+pyproject.toml                   pachet, configurare ruff și mypy
+call_book/                       pachetul aplicației
+  models.py                      modele de date, inclusiv QSO.from_row()
+  database.py                    acces SQLite parametrizat
+  validators.py                  validare și benzi
+  adif_export.py                 export ADIF
+  excel_export.py                export Excel
+  backup.py                      backup SQLite
+  config.py                      configurare JSON
+  application_controller.py      cazuri de utilizare independente de UI
+  propagation.py                 vocabular de propagare și mapare ADIF
+  propagation_models.py          modele imuabile pentru date meteo spațiale
+  utils/maidenhead.py            conversie locală coordonate/locator
+  services/location_service.py   API Windows Location izolat de interfață
+  services/propagation_service.py reguli testabile pentru sugestia implicită de propagare
+  ui/                             interfața PySide6 / Qt for Python
+tests/                           teste unittest
+data/ exports/ backups/          date runtime
 ```
 
 ## Limitări și extensii

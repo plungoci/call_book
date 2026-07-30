@@ -1,10 +1,17 @@
 """Unit tests for propagation defaults; no graphical display is required."""
+
 import unittest
 
-from services.propagation_service import (
-    PROPAGATION_DIRECT, PROPAGATION_F2, PROPAGATION_METEOR_SCATTER,
-    PROPAGATION_NVIS, PROPAGATION_REPEATER, PROPAGATION_SATELLITE,
-    PROPAGATION_SPORADIC_E, PROPAGATION_UNKNOWN, PropagationSuggestionState,
+from call_book.services.propagation_service import (
+    PROPAGATION_DIRECT,
+    PROPAGATION_F2,
+    PROPAGATION_METEOR_SCATTER,
+    PROPAGATION_NVIS,
+    PROPAGATION_REPEATER,
+    PROPAGATION_SATELLITE,
+    PROPAGATION_SPORADIC_E,
+    PROPAGATION_UNKNOWN,
+    PropagationSuggestionState,
     suggest_propagation_mode,
 )
 
@@ -25,7 +32,9 @@ class PropagationServiceTests(unittest.TestCase):
         self.assertEqual(suggest_propagation_mode("70cm", repeater_selected=True), PROPAGATION_REPEATER)
         self.assertEqual(suggest_propagation_mode("2m", satellite_selected=True), PROPAGATION_SATELLITE)
         self.assertEqual(suggest_propagation_mode("70cm", satellite_selected=True), PROPAGATION_SATELLITE)
-        self.assertEqual(suggest_propagation_mode("2m", repeater_selected=True, satellite_selected=True), PROPAGATION_SATELLITE)
+        self.assertEqual(
+            suggest_propagation_mode("2m", repeater_selected=True, satellite_selected=True), PROPAGATION_SATELLITE
+        )
 
     def test_msk_and_fm_rules(self):
         self.assertEqual(suggest_propagation_mode("2m", mode="MSK144"), PROPAGATION_METEOR_SCATTER)
@@ -45,7 +54,8 @@ class PropagationServiceTests(unittest.TestCase):
 
 class PropagationSuggestionStateTests(unittest.TestCase):
     def test_manual_value_is_protected(self):
-        state = PropagationSuggestionState(); state.mark_manual()
+        state = PropagationSuggestionState()
+        state.mark_manual()
         self.assertFalse(state.may_apply(PROPAGATION_DIRECT))
 
     def test_new_qso_resets_manual_protection(self):
@@ -54,7 +64,8 @@ class PropagationSuggestionStateTests(unittest.TestCase):
         self.assertTrue(state.may_apply(PROPAGATION_DIRECT))
 
     def test_existing_qso_is_preserved_on_load(self):
-        state = PropagationSuggestionState(); state.load_existing_qso()
+        state = PropagationSuggestionState()
+        state.load_existing_qso()
         self.assertFalse(state.may_apply(PROPAGATION_F2))
 
     def test_forced_recalculation_and_significant_context_override(self):
