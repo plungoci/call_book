@@ -19,8 +19,9 @@ DEFAULT_CONFIG = {
     "backup_directory": "backups",
     "show_propagation_panel": "true",
     "propagation_auto_refresh_minutes": "15",
+    "local_weather_auto_refresh_minutes": "30",
 }
-PROPAGATION_REFRESH_INTERVALS = frozenset({"10", "15", "30", "60"})
+REFRESH_INTERVALS = frozenset({"10", "15", "30", "60"})
 
 
 def load_config(path: Path = CONFIG_PATH) -> dict[str, str]:

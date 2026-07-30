@@ -8,7 +8,7 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import *
 
 from ..application_controller import DuplicateQsoCancelled, LogbookController
-from ..config import PROPAGATION_REFRESH_INTERVALS, save_config
+from ..config import REFRESH_INTERVALS, save_config
 from .operator_profile_window import OperatorProfileWindow
 from .propagation_panel import PropagationPanel
 from .qso_form import QSOForm
@@ -59,6 +59,10 @@ class MainWindow(QMainWindow):
         self.propagation_auto_refresh_timer.setSingleShot(True)
         self.propagation_auto_refresh_timer.timeout.connect(self._automatic_propagation_refresh)
         self._schedule_propagation_auto_refresh()
+        self.weather_auto_refresh_timer = QTimer(self)
+        self.weather_auto_refresh_timer.setSingleShot(True)
+        self.weather_auto_refresh_timer.timeout.connect(self._automatic_weather_refresh)
+        self._schedule_weather_auto_refresh()
         # Deferred, like the propagation panel's own refresh: avoids a network
         # call firing before the window is even shown, and keeps plain
         # widget-construction (including tests) free of background I/O, since
@@ -81,6 +85,7 @@ class MainWindow(QMainWindow):
         settings.addAction("Date operator", self.open_operator_profile)
         settings.addAction("Repetoare", self.open_repeaters)
         settings.addAction("Setări propagare", self.open_propagation_settings)
+        settings.addAction("Setări vreme locală", self.open_weather_settings)
         settings.addSeparator()
         settings.addAction("Resetează numerotarea ID-urilor", self.reset_id_sequences)
 
@@ -210,6 +215,7 @@ class MainWindow(QMainWindow):
             ("Date operator", self.open_operator_profile),
             ("Administrează repetoare", self.open_repeaters),
             ("Setări propagare", self.open_propagation_settings),
+            ("Setări vreme locală", self.open_weather_settings),
             ("Creează backup", self.backup),
             ("Resetează numerotarea ID-urilor", self.reset_id_sequences),
         ]:
@@ -312,6 +318,25 @@ class MainWindow(QMainWindow):
             self.propagation_context_changed(self.form.text("band"), self.form.text("frequency_mhz"))
         self._schedule_propagation_auto_refresh()
 
+    def _schedule_weather_auto_refresh(self):
+        """Reschedule the recurring background refresh from the current config.
+
+        Re-reads local_weather_auto_refresh_minutes each time so a change
+        saved in Setări → Setări vreme locală takes effect on the next cycle.
+        """
+        self.weather_auto_refresh_timer.stop()
+        try:
+            minutes = int(self.app_config.get("local_weather_auto_refresh_minutes", "30"))
+        except ValueError:
+            minutes = 30
+        if minutes not in (10, 15, 30, 60):
+            return
+        self.weather_auto_refresh_timer.start(minutes * 60 * 1000)
+
+    def _automatic_weather_refresh(self):
+        self.form.weather_panel.refresh()
+        self._schedule_weather_auto_refresh()
+
     def _update_station_locator(self):
         locator = self.operator_profile.grid_square or self.operator_profile.maidenhead_locator
         self.station_locator.setText(f"<h2>{locator}</h2>" if locator else "")
@@ -333,9 +358,7 @@ class MainWindow(QMainWindow):
         enabled = QCheckBox("Actualizare automată")
         interval = QComboBox()
         interval.addItems(("10", "15", "30", "60"))
-        enabled.setChecked(
-            self.app_config.get("propagation_auto_refresh_minutes", "15") in PROPAGATION_REFRESH_INTERVALS
-        )
+        enabled.setChecked(self.app_config.get("propagation_auto_refresh_minutes", "15") in REFRESH_INTERVALS)
         layout.addRow(enabled)
         layout.addRow("Interval (minute)", interval)
         b = QPushButton("Salvează")
@@ -344,6 +367,32 @@ class MainWindow(QMainWindow):
             self.app_config["propagation_auto_refresh_minutes"] = interval.currentText() if enabled.isChecked() else "0"
             save_config(self.app_config)
             self._schedule_propagation_auto_refresh()
+            d.accept()
+
+        b.clicked.connect(save_and_close)
+        layout.addRow(b)
+        d.exec()
+
+    def open_weather_settings(self):
+        d = QDialog(self)
+        layout = QFormLayout(d)
+        enabled = QCheckBox("Actualizare automată")
+        interval = QComboBox()
+        interval.addItems(("10", "15", "30", "60"))
+        current = self.app_config.get("local_weather_auto_refresh_minutes", "30")
+        enabled.setChecked(current in REFRESH_INTERVALS)
+        if current in REFRESH_INTERVALS:
+            interval.setCurrentText(current)
+        layout.addRow(enabled)
+        layout.addRow("Interval (minute)", interval)
+        b = QPushButton("Salvează")
+
+        def save_and_close():
+            self.app_config["local_weather_auto_refresh_minutes"] = (
+                interval.currentText() if enabled.isChecked() else "0"
+            )
+            save_config(self.app_config)
+            self._schedule_weather_auto_refresh()
             d.accept()
 
         b.clicked.connect(save_and_close)
@@ -387,6 +436,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         self.propagation_auto_refresh_timer.stop()
+        self.weather_auto_refresh_timer.stop()
         if self.propagation_panel is not None:
             self.propagation_panel.shutdown()
         self.form.shutdown()

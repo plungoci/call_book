@@ -3,7 +3,7 @@
 import logging
 
 from PySide6.QtCore import QObject, QThread, Signal
-from PySide6.QtWidgets import QFormLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
+from PySide6.QtWidgets import QFormLayout, QGroupBox, QLabel, QVBoxLayout
 
 from ..services.local_weather_service import LocalWeatherService
 
@@ -33,15 +33,9 @@ class LocalWeatherPanel(QGroupBox):
         self.location_provider = location_provider
         self._worker_thread = None
         layout = QVBoxLayout(self)
-        top = QHBoxLayout()
         self.status = QLabel("Neactualizat.")
         self.status.setWordWrap(True)
-        self.button = QPushButton("Actualizează")
-        self.button.clicked.connect(self.refresh)
-        top.addWidget(self.status)
-        top.addStretch()
-        top.addWidget(self.button)
-        layout.addLayout(top)
+        layout.addWidget(self.status)
         form = QFormLayout()
         self.temperature_label = QLabel("N/A")
         self.humidity_label = QLabel("N/A")
@@ -57,7 +51,6 @@ class LocalWeatherPanel(QGroupBox):
         if latitude is None or longitude is None:
             self.status.setText("Locația stației nu este setată (Setări → Date operator).")
             return
-        self.button.setEnabled(False)
         self.status.setText("Se descarcă date…")
         thread = QThread(self)
         self._worker_thread = thread
@@ -68,7 +61,6 @@ class LocalWeatherPanel(QGroupBox):
         self.worker.finished.connect(thread.quit)
         self.worker.failed.connect(lambda: self.status.setText("Ultima actualizare nu a reușit."))
         self.worker.failed.connect(thread.quit)
-        thread.finished.connect(lambda: self.button.setEnabled(True))
         thread.start()
 
     def update_values(self, w):
