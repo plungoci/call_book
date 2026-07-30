@@ -8,7 +8,7 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import *
 
 from ..application_controller import DuplicateQsoCancelled, LogbookController
-from ..config import REFRESH_INTERVALS, save_config
+from ..config import REFRESH_INTERVAL_OPTIONS, REFRESH_INTERVALS, save_config
 from .operator_profile_window import OperatorProfileWindow
 from .propagation_panel import PropagationPanel
 from .qso_form import QSOForm
@@ -309,7 +309,7 @@ class MainWindow(QMainWindow):
             minutes = int(self.app_config.get("propagation_auto_refresh_minutes", "15"))
         except ValueError:
             minutes = 15
-        if minutes not in (10, 15, 30, 60):
+        if str(minutes) not in REFRESH_INTERVALS:
             return
         self.propagation_auto_refresh_timer.start(minutes * 60 * 1000)
 
@@ -329,7 +329,7 @@ class MainWindow(QMainWindow):
             minutes = int(self.app_config.get("local_weather_auto_refresh_minutes", "30"))
         except ValueError:
             minutes = 30
-        automatic_refresh_enabled = minutes in (10, 15, 30, 60)
+        automatic_refresh_enabled = str(minutes) in REFRESH_INTERVALS
         self.form.weather_panel.set_manual_refresh_available(not automatic_refresh_enabled)
         if not automatic_refresh_enabled:
             return
@@ -359,8 +359,11 @@ class MainWindow(QMainWindow):
         layout = QFormLayout(d)
         enabled = QCheckBox("Actualizare automată")
         interval = QComboBox()
-        interval.addItems(("10", "15", "30", "60"))
-        enabled.setChecked(self.app_config.get("propagation_auto_refresh_minutes", "15") in REFRESH_INTERVALS)
+        interval.addItems(REFRESH_INTERVAL_OPTIONS)
+        current = self.app_config.get("propagation_auto_refresh_minutes", "15")
+        enabled.setChecked(current in REFRESH_INTERVALS)
+        if current in REFRESH_INTERVALS:
+            interval.setCurrentText(current)
         layout.addRow(enabled)
         layout.addRow("Interval (minute)", interval)
         b = QPushButton("Salvează")
@@ -380,7 +383,7 @@ class MainWindow(QMainWindow):
         layout = QFormLayout(d)
         enabled = QCheckBox("Actualizare automată")
         interval = QComboBox()
-        interval.addItems(("10", "15", "30", "60"))
+        interval.addItems(REFRESH_INTERVAL_OPTIONS)
         current = self.app_config.get("local_weather_auto_refresh_minutes", "30")
         enabled.setChecked(current in REFRESH_INTERVALS)
         if current in REFRESH_INTERVALS:

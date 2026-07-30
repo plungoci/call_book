@@ -284,6 +284,17 @@ class QSOFormTests(unittest.TestCase):
 
             window.close()
 
+    def test_propagation_auto_refresh_supports_one_minute_interval(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = load_config()
+            config["propagation_auto_refresh_minutes"] = "1"
+            window = MainWindow(Database(Path(directory) / "logbook.db"), config)
+
+            self.assertTrue(window.propagation_auto_refresh_timer.isActive())
+            self.assertEqual(window.propagation_auto_refresh_timer.interval(), 60 * 1000)
+
+            window.close()
+
     def test_propagation_auto_refresh_disabled_for_interval_zero(self):
         with tempfile.TemporaryDirectory() as directory:
             config = load_config()
@@ -345,6 +356,18 @@ class QSOFormTests(unittest.TestCase):
 
             self.assertTrue(window.weather_auto_refresh_timer.isActive())
             self.assertEqual(window.weather_auto_refresh_timer.interval(), 30 * 60 * 1000)
+
+            window.close()
+
+    def test_weather_auto_refresh_supports_five_minute_interval(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = load_config()
+            config["local_weather_auto_refresh_minutes"] = "5"
+            window = MainWindow(Database(Path(directory) / "logbook.db"), config)
+
+            self.assertTrue(window.weather_auto_refresh_timer.isActive())
+            self.assertEqual(window.weather_auto_refresh_timer.interval(), 5 * 60 * 1000)
+            self.assertTrue(window.form.weather_panel.button.isHidden())
 
             window.close()
 

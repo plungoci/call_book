@@ -167,17 +167,17 @@ Pe laptopuri fără GPS, Windows poate estima poziția din Wi-Fi, rețea sau alt
 
 ### Setări propagare
 
-**Setări → Setări propagare** conține o bifă **Actualizare automată** și un interval configurabil (10, 15, 30 sau 60 de minute), salvate în `config.json` ca `propagation_auto_refresh_minutes`. **Salvează** persistă valoarea și reprogramează imediat actualizarea automată a panoului de propagare (vezi mai jos). Dezactivarea bifei salvează intervalul ca `"0"`, ceea ce oprește actualizarea automată complet.
+**Setări → Setări propagare** conține o bifă **Actualizare automată** și un interval configurabil (1, 5, 10, 15, 30 sau 60 de minute), salvate în `config.json` ca `propagation_auto_refresh_minutes`. **Salvează** persistă valoarea și reprogramează imediat actualizarea automată a panoului de propagare (vezi mai jos). Dezactivarea bifei salvează intervalul ca `"0"`, ceea ce oprește actualizarea automată complet.
 
 ### Setări vreme locală
 
-**Setări → Setări vreme locală** funcționează identic cu Setări propagare: o bifă **Actualizare automată** și un interval configurabil (10, 15, 30 sau 60 de minute), salvate în `config.json` ca `local_weather_auto_refresh_minutes` (implicit 30). **Salvează** reprogramează imediat actualizarea automată a panoului **Vreme locală**; dezactivarea bifei salvează `"0"`, oprind actualizarea automată complet. Panoul de vreme locală nu are un buton de actualizare manuală — aceasta este singura cale de a-i schimba cadența.
+**Setări → Setări vreme locală** funcționează identic cu Setări propagare: o bifă **Actualizare automată** și un interval configurabil (1, 5, 10, 15, 30 sau 60 de minute), salvate în `config.json` ca `local_weather_auto_refresh_minutes` (implicit 30). **Salvează** reprogramează imediat actualizarea automată a panoului **Vreme locală**; dezactivarea bifei salvează `"0"`, oprind actualizarea automată complet. Panoul de vreme locală nu are un buton de actualizare manuală — aceasta este singura cale de a-i schimba cadența.
 
 ## Panou condiții de propagare
 
 Fereastra principală poate conține un panou compact **Condiții de propagare**, nu o hartă — vizibil doar dacă `show_propagation_panel` din `config.json` este `"true"` (implicit). Fiecare valoare disponibilă arată unitatea, furnizorul și vechimea sa; o valoare fără observație verificabilă este **N/A**, niciodată zero. Modelul unificat reține valoarea, unitatea, sursa, momentul UTC, vechimea calculată, calitatea și starea. Tabelul HF calculează separat zi/noapte pentru 80, 40, 20, 15 și 10 m. Este o euristică locală, cu încredere scăzută/medie după acoperirea indicilor: **nu este VOACAP și nu este o predicție garantată**.
 
-Actualizarea se produce în trei situații: la apăsarea butonului **Actualizează**, automat (cu întârziere de 700 ms) când banda din formularul QSO se schimbă, și periodic — dacă panoul e activat, la fiecare `propagation_auto_refresh_minutes` (10/15/30/60) minute, doar dacă o bandă e curentă selectată în formular. Actualizarea din fundal se oprește automat la închiderea aplicației. Toate cererile HTTP rulează într-un fir separat, ca să nu blocheze interfața.
+Actualizarea se produce în trei situații: la apăsarea butonului **Actualizează**, automat (cu întârziere de 700 ms) când banda din formularul QSO se schimbă, și periodic — dacă panoul e activat, la fiecare `propagation_auto_refresh_minutes` (1/5/10/15/30/60) minute, doar dacă o bandă e curentă selectată în formular. Actualizarea din fundal se oprește automat la închiderea aplicației. Toate cererile HTTP rulează într-un fir separat, ca să nu blocheze interfața.
 
 ### Furnizori și produse
 
@@ -202,8 +202,8 @@ Fișierul e creat automat la prima pornire, cu chei implicite. Doar trei chei au
 | Cheie | Valori | Efect |
 |---|---|---|
 | `show_propagation_panel` | `"true"` / `"false"` | dacă tab-ul **Propagare** și panoul asociat sunt create la pornire |
-| `propagation_auto_refresh_minutes` | `"10"`, `"15"`, `"30"`, `"60"` (orice altă valoare dezactivează) | intervalul actualizării automate a panoului de propagare |
-| `local_weather_auto_refresh_minutes` | `"10"`, `"15"`, `"30"`, `"60"` (orice altă valoare dezactivează) | intervalul actualizării automate a panoului de vreme locală |
+| `propagation_auto_refresh_minutes` | `"1"`, `"5"`, `"10"`, `"15"`, `"30"`, `"60"` (orice altă valoare dezactivează) | intervalul actualizării automate a panoului de propagare |
+| `local_weather_auto_refresh_minutes` | `"1"`, `"5"`, `"10"`, `"15"`, `"30"`, `"60"` (orice altă valoare dezactivează) | intervalul actualizării automate a panoului de vreme locală |
 
 Fișierul mai reține și câteva chei suplimentare (`user_callsign`, `operator_name`, `grid_square`, `location`, `equipment`, `antenna`, `default_power_w`, `export_directory`, `backup_directory`) care nu sunt citite momentan de aplicație — datele reale ale operatorului sunt stocate în tabelul SQLite `operator_profile`, iar exporturile/backup-ul folosesc directoarele implicite `exports/`/`backups/`.
 

@@ -21,7 +21,8 @@ DEFAULT_CONFIG = {
     "propagation_auto_refresh_minutes": "15",
     "local_weather_auto_refresh_minutes": "30",
 }
-REFRESH_INTERVALS = frozenset({"10", "15", "30", "60"})
+REFRESH_INTERVAL_OPTIONS = ("1", "5", "10", "15", "30", "60")
+REFRESH_INTERVALS = frozenset(REFRESH_INTERVAL_OPTIONS)
 
 
 def load_config(path: Path = CONFIG_PATH) -> dict[str, str]:
