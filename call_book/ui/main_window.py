@@ -59,6 +59,11 @@ class MainWindow(QMainWindow):
         self.propagation_auto_refresh_timer.setSingleShot(True)
         self.propagation_auto_refresh_timer.timeout.connect(self._automatic_propagation_refresh)
         self._schedule_propagation_auto_refresh()
+        # Deferred, like the propagation panel's own refresh: avoids a network
+        # call firing before the window is even shown, and keeps plain
+        # widget-construction (including tests) free of background I/O, since
+        # a QTimer only fires once the Qt event loop actually runs.
+        QTimer.singleShot(1500, self.form.weather_panel.refresh)
         self.refresh()
 
     def _menu(self):
@@ -130,7 +135,9 @@ class MainWindow(QMainWindow):
         b.clicked.connect(self.refresh)
         filters.addWidget(b)
         layout.addLayout(filters)
-        self.form = QSOForm(self.db.list_repeaters)
+        self.form = QSOForm(
+            self.db.list_repeaters, lambda: (self.operator_profile.latitude, self.operator_profile.longitude)
+        )
         self.form.contextChanged.connect(self.propagation_context_changed)
         layout.addWidget(self.form)
         actions = QHBoxLayout()
@@ -303,6 +310,7 @@ class MainWindow(QMainWindow):
         d.exec()
         self.operator_profile = self.db.get_operator_profile()
         self._update_station_locator()
+        self.form.weather_panel.refresh()
 
     def open_repeaters(self):
         d = RepeaterWindow(self, self.db, self.form.refresh_repeaters)
@@ -370,4 +378,5 @@ class MainWindow(QMainWindow):
         self.propagation_auto_refresh_timer.stop()
         if self.propagation_panel is not None:
             self.propagation_panel.shutdown()
+        self.form.shutdown()
         event.accept()

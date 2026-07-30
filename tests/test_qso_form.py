@@ -20,8 +20,9 @@ if QApplication is not None:
     from call_book.config import load_config
     from call_book.database import Database
     from call_book.models import QSO
+    from call_book.services.local_weather_service import LocalWeatherData
     from call_book.ui.main_window import MainWindow
-    from call_book.ui.qso_form import FIELD_GROUPS, FIELD_KEYS, LABELS, QSOForm, validate_field_labels
+    from call_book.ui.qso_form import _FIELD_MAX_WIDTH, FIELD_GROUPS, FIELD_KEYS, LABELS, QSOForm, validate_field_labels
 
 
 @unittest.skipUnless(QApplication is not None, "PySide6 is required for Qt UI tests")
@@ -140,6 +141,37 @@ class QSOFormTests(unittest.TestCase):
 
         self.assertEqual(self.form.text("propagation_mode"), "EME (Moonbounce)")
 
+    def test_form_fields_have_a_bounded_maximum_width(self):
+        # Regression test: fields used to stretch to the full window width,
+        # leaving no room for the local weather panel beside them.
+        for key in ("callsign", "mode", "propagation_mode"):
+            self.assertLessEqual(self.form.fields[key].maximumWidth(), _FIELD_MAX_WIDTH)
+
+    def test_weather_panel_does_not_fetch_on_construction(self):
+        # Regression test: an eager fetch in __init__ made every MainWindow
+        # construction (including plain unit tests) spawn a real background
+        # network thread, mirroring what PropagationPanel deliberately avoids.
+        self.assertIsNone(self.form.weather_panel._worker_thread)
+
+    def test_weather_panel_shows_unset_message_without_a_location_provider(self):
+        self.form.weather_panel.refresh()
+        self.assertIn("nu este setată", self.form.weather_panel.status.text())
+
+    def test_weather_panel_uses_the_forms_location_provider(self):
+        form = QSOForm(lambda: [], location_provider=lambda: (46.77, 23.6))
+        self.assertEqual(form.weather_panel.location_provider(), (46.77, 23.6))
+
+    def test_weather_panel_displays_fetched_values(self):
+        self.form.weather_panel.update_values(
+            LocalWeatherData(temperature_c=21.3, humidity_percent=55, condition="Înnorat")
+        )
+        self.assertEqual(self.form.weather_panel.temperature_label.text(), "21.3 °C")
+        self.assertEqual(self.form.weather_panel.humidity_label.text(), "55%")
+        self.assertEqual(self.form.weather_panel.condition_label.text(), "Înnorat")
+
+    def test_shutdown_does_not_raise_without_an_active_worker(self):
+        self.form.shutdown()
+
     def test_repeater_dropdown_matches_mode_and_propagation_mode_behavior(self):
         # Repeater must open/select/close exactly like Mode and Propagation
         # mode: a plain, non-editable QComboBox that opens on any click.
@@ -188,6 +220,18 @@ class QSOFormTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             window = MainWindow(Database(Path(directory) / "logbook.db"), load_config())
             self.assertIsInstance(window.form, QSOForm)
+            window.close()
+
+    def test_main_window_wires_operator_profile_location_into_the_weather_panel(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Database(Path(directory) / "logbook.db")
+            profile = database.get_operator_profile()
+            profile.latitude, profile.longitude = 46.77, 23.6
+            database.save_operator_profile(profile)
+
+            window = MainWindow(database, load_config())
+
+            self.assertEqual(window.form.weather_panel.location_provider(), (46.77, 23.6))
             window.close()
 
     def test_show_propagation_panel_false_hides_the_tab(self):

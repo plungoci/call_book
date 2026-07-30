@@ -17,6 +17,7 @@ Aplicație desktop locală/offline pentru evidența legăturilor radioamatorice 
 - **Export ADIF** cu lungimi de câmp calculate exact în octeți (suport diacritice).
 - **Backup SQLite online** (API `sqlite3.backup()`), fără să blocheze aplicația.
 - **Panou „Condiții de propagare”**: indici meteo spațiali (Kp, SFI, SSN, raze X, vânt solar etc.) de la NOAA/SILSO/GFZ/NRCan/HamQSL și o estimare orientativă zi/noapte pentru benzile HF, cu actualizare automată configurabilă.
+- **Vreme locală**: temperatură, umiditate și condiții curente la poziția stației (Open-Meteo, fără cheie API), afișate direct lângă formularul QSO.
 - **Resetare numerotare ID-uri** pentru QSO-uri, repetoare și stații, fără pierderea datelor.
 
 ## Cerințe și instalare
@@ -125,6 +126,10 @@ O alegere manuală a utilizatorului este protejată: odată ce ai selectat manua
 - Dacă un QSO cu același indicativ, frecvență și mod există deja, aplicația cere confirmare înainte de a salva un posibil duplicat.
 
 Câmpul intern **locator propriu** (`my_grid_square`) este completat automat, la crearea unui QSO nou, cu locatorul curent din profilul operatorului, pentru acuratețe istorică — nu se schimbă retroactiv dacă profilul e actualizat ulterior.
+
+### Vreme locală
+
+Lângă formular, panoul **Vreme locală** afișează temperatura, umiditatea și condițiile curente la poziția stației (latitudine/longitudine din profilul operatorului), preluate de la [Open-Meteo](https://open-meteo.com/) — public, fără cheie API. Se actualizează automat, o singură dată, la scurt timp după deschiderea aplicației, și oricând la apăsarea butonului **Actualizează**; dacă poziția stației nu e setată (Setări → Date operator), panoul arată acest lucru în loc să încerce o cerere fără sens. La fel ca panoul de propagare, orice eșec de rețea lasă ultimele valori afișate neschimbate, cu un mesaj de stare clar.
 
 ## Meniul Fișier
 
@@ -235,6 +240,7 @@ call_book/                           pachetul aplicației
   services/propagation_estimator.py  estimare orientativă zi/noapte pentru benzile HF
   services/propagation_cache.py      cache local pentru datele meteo spațiale
   services/space_weather_service.py  clienți NOAA/SILSO/GFZ/NRCan/HamQSL
+  services/local_weather_service.py  client Open-Meteo pentru vremea locală
   ui/                                 interfața PySide6 / Qt for Python
 tests/                                teste unittest (vezi mai jos)
 data/ exports/ backups/ cache/        date runtime (negestionate în Git)
