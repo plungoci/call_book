@@ -36,9 +36,7 @@ class QSOFormTests(unittest.TestCase):
     def setUp(self):
         self.form = QSOForm(lambda: [])
 
-    @unittest.expectedFailure
     def test_all_form_fields_have_exactly_one_label(self):
-        # Pre-existing bug: see test_callsign_field_has_label_widget_and_helpful_tooltip.
         self.assertEqual(len(FIELD_KEYS), len(set(FIELD_KEYS)))
         self.assertEqual(set(FIELD_KEYS), set(LABELS))
         validate_field_labels()
@@ -58,12 +56,7 @@ class QSOFormTests(unittest.TestCase):
 
         self.assertIn("callsign", form.fields)
 
-    @unittest.expectedFailure
     def test_callsign_field_has_label_widget_and_helpful_tooltip(self):
-        # Pre-existing bug: LABELS = dict(FORM_FIELDS) builds {romanian_label: key}
-        # because FORM_FIELDS pairs are (label, key), so lookups by field key
-        # always miss. Fixing it changes visible UI label text, which is outside
-        # the scope of this refactor; tracked here instead of silently skipped.
         self.assertEqual(LABELS["callsign"], "Indicativ")
         self.assertIn("callsign", self.form.fields)
         self.assertIn("indicativul", self.form.fields["callsign"].toolTip().lower())
@@ -113,6 +106,40 @@ class QSOFormTests(unittest.TestCase):
 
         self.assertEqual(self.form.text("propagation_mode"), "Satelit")
 
+    def test_band_change_suggests_propagation_mode_for_new_qso(self):
+        # Regression test: suggest_propagation_mode/PropagationSuggestionState
+        # exist and are unit-tested but were never wired into the form after
+        # the Tkinter-to-PySide6 migration, so this never actually ran.
+        self.form.set_text("band", "20m")
+
+        self.assertEqual(self.form.text("propagation_mode"), "F2")
+
+    def test_manually_selected_propagation_mode_is_protected_from_band_changes(self):
+        self.form.set_text("propagation_mode", "EME (Moonbounce)")
+
+        self.form.set_text("band", "20m")
+
+        self.assertEqual(self.form.text("propagation_mode"), "EME (Moonbounce)")
+
+    def test_selecting_repeater_overrides_manual_propagation_mode(self):
+        def repeaters():
+            return [{"id": 3, "name": "YO3RPT", "output_frequency_mhz": 145.6, "mode": "FM"}]
+
+        form = QSOForm(repeaters)
+        form.set_text("propagation_mode", "EME (Moonbounce)")
+
+        form.fields["repeater"].setCurrentIndex(1)
+
+        self.assertEqual(form.text("propagation_mode"), "Repeater")
+
+    def test_loading_an_existing_qso_protects_its_propagation_mode(self):
+        qso = QSO(id=7, callsign="YO3ABC", frequency_mhz=145.5, mode="FM", propagation_mode="EME (Moonbounce)")
+
+        self.form.load(qso)
+        self.form.set_text("band", "20m")
+
+        self.assertEqual(self.form.text("propagation_mode"), "EME (Moonbounce)")
+
     def test_repeater_dropdown_matches_mode_and_propagation_mode_behavior(self):
         # Repeater must open/select/close exactly like Mode and Propagation
         # mode: a plain, non-editable QComboBox that opens on any click.
@@ -161,6 +188,82 @@ class QSOFormTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             window = MainWindow(Database(Path(directory) / "logbook.db"), load_config())
             self.assertIsInstance(window.form, QSOForm)
+            window.close()
+
+    def test_show_propagation_panel_false_hides_the_tab(self):
+        # Regression test: this documented config setting had no effect at all
+        # before; the "Propagare" tab was always shown regardless of its value.
+        with tempfile.TemporaryDirectory() as directory:
+            config = load_config()
+            config["show_propagation_panel"] = "false"
+            window = MainWindow(Database(Path(directory) / "logbook.db"), config)
+
+            self.assertIsNone(window.propagation_panel)
+            tab_titles = [window.tabs.tabText(i) for i in range(window.tabs.count())]
+            self.assertNotIn("Propagare", tab_titles)
+
+            window.close()
+
+    def test_propagation_auto_refresh_timer_starts_with_configured_interval(self):
+        # Regression test: propagation_auto_refresh_minutes was read into
+        # config.json and shown in Setări → Setări propagare, but nothing
+        # ever scheduled a recurring refresh from it.
+        with tempfile.TemporaryDirectory() as directory:
+            config = load_config()
+            config["propagation_auto_refresh_minutes"] = "30"
+            window = MainWindow(Database(Path(directory) / "logbook.db"), config)
+
+            self.assertTrue(window.propagation_auto_refresh_timer.isActive())
+            self.assertEqual(window.propagation_auto_refresh_timer.interval(), 30 * 60 * 1000)
+
+            window.close()
+
+    def test_propagation_auto_refresh_disabled_for_interval_zero(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = load_config()
+            config["propagation_auto_refresh_minutes"] = "0"
+            window = MainWindow(Database(Path(directory) / "logbook.db"), config)
+
+            self.assertFalse(window.propagation_auto_refresh_timer.isActive())
+
+            window.close()
+
+    def test_propagation_auto_refresh_disabled_when_panel_hidden(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = load_config()
+            config["show_propagation_panel"] = "false"
+            config["propagation_auto_refresh_minutes"] = "15"
+            window = MainWindow(Database(Path(directory) / "logbook.db"), config)
+
+            self.assertFalse(window.propagation_auto_refresh_timer.isActive())
+
+            window.close()
+
+    def test_automatic_propagation_refresh_reschedules_itself(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = load_config()
+            config["propagation_auto_refresh_minutes"] = "10"
+            window = MainWindow(Database(Path(directory) / "logbook.db"), config)
+            window.propagation_auto_refresh_timer.stop()
+
+            window._automatic_propagation_refresh()
+
+            self.assertTrue(window.propagation_auto_refresh_timer.isActive())
+            self.assertEqual(window.propagation_auto_refresh_timer.interval(), 10 * 60 * 1000)
+
+            window.close()
+
+    def test_saving_propagation_settings_reschedules_the_timer(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = load_config()
+            config["propagation_auto_refresh_minutes"] = "10"
+            window = MainWindow(Database(Path(directory) / "logbook.db"), config)
+
+            window.app_config["propagation_auto_refresh_minutes"] = "60"
+            window._schedule_propagation_auto_refresh()
+
+            self.assertEqual(window.propagation_auto_refresh_timer.interval(), 60 * 60 * 1000)
+
             window.close()
 
 

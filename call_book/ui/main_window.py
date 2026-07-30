@@ -43,6 +43,8 @@ class MainWindow(QMainWindow):
         self.app_config = config
         self.controller = LogbookController(db)
         self.operator_profile = db.get_operator_profile()
+        self.show_propagation_panel = self.app_config.get("show_propagation_panel", "true") == "true"
+        self.propagation_panel = None
         self.setWindowTitle("Radio Logbook")
         self.resize(1440, 900)
         self.setMinimumSize(1024, 700)
@@ -53,6 +55,10 @@ class MainWindow(QMainWindow):
         self.clock_timer.timeout.connect(self._clock)
         self.clock_timer.start(1000)
         self._clock()
+        self.propagation_auto_refresh_timer = QTimer(self)
+        self.propagation_auto_refresh_timer.setSingleShot(True)
+        self.propagation_auto_refresh_timer.timeout.connect(self._automatic_propagation_refresh)
+        self._schedule_propagation_auto_refresh()
         self.refresh()
 
     def _menu(self):
@@ -89,15 +95,16 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         root.addWidget(self.tabs)
         self.log = QWidget()
-        self.propagation_tab = QWidget()
         self.location = QWidget()
         self.settings = QWidget()
         self.tabs.addTab(self.log, "Jurnal QSO")
-        self.tabs.addTab(self.propagation_tab, "Propagare")
+        if self.show_propagation_panel:
+            self.propagation_tab = QWidget()
+            self.tabs.addTab(self.propagation_tab, "Propagare")
+            self._propagation()
         self.tabs.addTab(self.location, "Locație")
         self.tabs.addTab(self.settings, "Setări")
         self._log()
-        self._propagation()
         self._location()
         self._settings()
         self.status = QLabel("Gata pentru un QSO nou.")
@@ -262,7 +269,30 @@ class MainWindow(QMainWindow):
             self.cancel_edit()
 
     def propagation_context_changed(self, band, freq):
-        self.propagation_panel.schedule(band)
+        if self.propagation_panel is not None:
+            self.propagation_panel.schedule(band)
+
+    def _schedule_propagation_auto_refresh(self):
+        """Reschedule the recurring background refresh from the current config.
+
+        Re-reads propagation_auto_refresh_minutes each time so a change saved
+        in Setări → Setări propagare takes effect on the next cycle.
+        """
+        self.propagation_auto_refresh_timer.stop()
+        if not self.show_propagation_panel:
+            return
+        try:
+            minutes = int(self.app_config.get("propagation_auto_refresh_minutes", "15"))
+        except ValueError:
+            minutes = 15
+        if minutes not in (10, 15, 30, 60):
+            return
+        self.propagation_auto_refresh_timer.start(minutes * 60 * 1000)
+
+    def _automatic_propagation_refresh(self):
+        if self.propagation_panel is not None and self.form.text("band"):
+            self.propagation_context_changed(self.form.text("band"), self.form.text("frequency_mhz"))
+        self._schedule_propagation_auto_refresh()
 
     def _update_station_locator(self):
         locator = self.operator_profile.grid_square or self.operator_profile.maidenhead_locator
@@ -294,6 +324,7 @@ class MainWindow(QMainWindow):
         def save_and_close():
             self.app_config["propagation_auto_refresh_minutes"] = interval.currentText() if enabled.isChecked() else "0"
             save_config(self.app_config)
+            self._schedule_propagation_auto_refresh()
             d.accept()
 
         b.clicked.connect(save_and_close)
@@ -336,5 +367,7 @@ class MainWindow(QMainWindow):
         self.clock.setText(f"Local {datetime.now():%H:%M:%S}  |  UTC {datetime.now(UTC):%H:%M:%S}")
 
     def closeEvent(self, event):
-        self.propagation_panel.shutdown()
+        self.propagation_auto_refresh_timer.stop()
+        if self.propagation_panel is not None:
+            self.propagation_panel.shutdown()
         event.accept()

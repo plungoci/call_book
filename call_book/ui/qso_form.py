@@ -16,7 +16,11 @@ from PySide6.QtWidgets import (
 from ..models import QSO
 from ..propagation import PROPAGATION_MODES
 from ..services.band_detector import BandDetector
-from ..services.propagation_service import PROPAGATION_UNKNOWN
+from ..services.propagation_service import (
+    PROPAGATION_UNKNOWN,
+    PropagationSuggestionState,
+    suggest_propagation_mode,
+)
 from ..utils.text_formatters import format_callsign, format_grid_square, format_operator_name
 
 MODES = (
@@ -52,7 +56,7 @@ FORM_FIELDS = (
     ("Locator", "grid_square"),
     ("Propagare", "propagation_mode"),
 )
-LABELS = dict(FORM_FIELDS)
+LABELS = {key: label for label, key in FORM_FIELDS}
 
 FIELD_GROUPS = (
     (
@@ -95,6 +99,8 @@ class QSOForm(QGroupBox):
         self.qso_id = None
         self.fields = {}
         self._loading = False
+        self.propagation_state = PropagationSuggestionState()
+        self._applying_suggestion = False
 
         layout = QVBoxLayout(self)
         grid = QGridLayout()
@@ -130,6 +136,10 @@ class QSOForm(QGroupBox):
         )
         self._line("frequency_mhz").textChanged.connect(self._frequency_changed)
         self._line("band").textChanged.connect(self._context)
+        self._line("band").textChanged.connect(self._update_propagation_suggestion)
+        self.fields["mode"].currentTextChanged.connect(self._update_propagation_suggestion)
+        self.fields["repeater"].currentTextChanged.connect(self._update_propagation_suggestion)
+        self.fields["propagation_mode"].currentTextChanged.connect(self._propagation_mode_changed)
         # Populate the editable combobox during form construction as well as
         # after repeater management changes.  Previously it was refreshed only
         # after closing the management dialog, so repeaters already stored in
@@ -217,6 +227,24 @@ class QSOForm(QGroupBox):
             self.set_text("frequency_mhz", repeater["output_frequency_mhz"])
             self.set_text("mode", repeater["mode"] or "FM")
 
+    def _update_propagation_suggestion(self, *_):
+        if self._loading:
+            return
+        suggestion = suggest_propagation_mode(
+            self.text("band"),
+            mode=self.text("mode"),
+            repeater_selected=bool(self.text("repeater").strip()),
+        )
+        if self.propagation_state.may_apply(suggestion):
+            self._applying_suggestion = True
+            self.set_text("propagation_mode", suggestion)
+            self._applying_suggestion = False
+
+    def _propagation_mode_changed(self, *_):
+        if self._loading or self._applying_suggestion:
+            return
+        self.propagation_state.mark_manual()
+
     def refresh_repeaters(self):
         widget = self.fields["repeater"]
         current = widget.currentText()
@@ -238,6 +266,7 @@ class QSOForm(QGroupBox):
         self.set_text("mode", "FM")
         self.set_text("propagation_mode", previous_propagation_mode)
         self.notes.clear()
+        self.propagation_state.reset_for_new_qso()
         self._loading = False
         self.fields["callsign"].setFocus()
 
@@ -250,6 +279,7 @@ class QSOForm(QGroupBox):
             elif hasattr(qso, key):
                 self.set_text(key, getattr(qso, key) or "")
         self.notes.setPlainText(qso.notes)
+        self.propagation_state.load_existing_qso()
         self._loading = False
 
     def value(self):

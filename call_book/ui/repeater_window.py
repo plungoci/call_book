@@ -72,6 +72,8 @@ class RepeaterWindow(QDialog):
     def save(self):
         try:
             v = {k: e.text().strip() for k, e in self.fields.items()}
+            if not v["name"]:
+                raise ValueError("Numele este obligatoriu.")
             self.db.save_repeater(
                 Repeater(
                     id=self.selected,
