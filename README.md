@@ -16,7 +16,7 @@ Aplicație desktop locală/offline pentru evidența legăturilor radioamatorice 
 - **Export Excel (`.xlsx`)** cu antet aldin, filtru automat, rând înghețat și lățimi de coloană ajustate.
 - **Export ADIF** cu lungimi de câmp calculate exact în octeți (suport diacritice).
 - **Backup SQLite online** (API `sqlite3.backup()`), fără să blocheze aplicația.
-- **Panou „Condiții de propagare”**: indici meteo spațiali (Kp, SFI, SSN, raze X, vânt solar etc.) de la NOAA/SILSO/GFZ/NRCan și o estimare orientativă zi/noapte pentru benzile HF, cu actualizare automată configurabilă.
+- **Panou „Condiții de propagare”**: indici meteo spațiali (Kp, SFI, SSN, raze X, vânt solar etc.) de la NOAA/SILSO/GFZ/NRCan/HamQSL și o estimare orientativă zi/noapte pentru benzile HF, cu actualizare automată configurabilă.
 - **Resetare numerotare ID-uri** pentru QSO-uri, repetoare și stații, fără pierderea datelor.
 
 ## Cerințe și instalare
@@ -172,12 +172,13 @@ Actualizarea se produce în trei situații: la apăsarea butonului **Actualizeaz
 
 ### Furnizori și produse
 
-* **NOAA SWPC** — JSON HTTPS public: `planetary_k_index_1m.json` (Kp și A), `solar-cycle/observed-solar-cycle-indices.json` (F10.7 și SSN), produsele GOES X-ray/protoni/electroni, fluxurile `plasma-7-day.json`/`mag-7-day.json` pentru vânt solar (viteză, densitate, temperatură, Bz/Bt), OVATION (probabilitate aurorală) și alertele R. Sunt produse globale, în principal minute/oră sau cele mai recente valori disponibile; pot întârzia, pot lipsi și nu reprezintă măsurători locale. NOAA este singura sursă pentru X-ray/protoni/electroni/aurorală/vânt solar/Bz/Bt — dacă e indisponibil, aceste metrici rămân „N/A”, fără o alternativă.
+* **NOAA SWPC** — JSON HTTPS public: `planetary_k_index_1m.json` (Kp și A), `solar-cycle/observed-solar-cycle-indices.json` (F10.7 și SSN), produsele GOES X-ray/protoni/electroni, fluxurile `plasma-7-day.json`/`mag-7-day.json` pentru vânt solar (viteză, densitate, temperatură, Bz/Bt), OVATION (probabilitate aurorală) și alertele R. Sunt produse globale, în principal minute/oră sau cele mai recente valori disponibile; pot întârzia, pot lipsi și nu reprezintă măsurători locale.
 * **SIDC/SILSO** — `https://www.sidc.be/SILSO/INFO/sndtotcsv.php`, CSV separat prin `;`, fără parametri. Se folosește ultimul *daily total sunspot number* valid (`count`), actualizat zilnic. Este preferat pentru SSN; nu este un flux în timp real.
 * **GFZ Potsdam** — `https://kp.gfz-potsdam.de/app/files/Kp_ap_nowcast.txt`, text whitespace-delimited, fără parametri. Se citesc ultima pereche Kp/Ap nowcast validă (indici Kp și Ap, fără unitate fizică, ignorând rândurile cu sentinela de date lipsă Kp=-1.000/ap=-1); cadența este de ordinul ferestrelor de 3 ore, iar valorile nowcast pot fi revizuite. Este preferat pentru Kp/Ap.
 * **NRCan (Space Weather Canada)** — `https://spaceweather.gc.ca/solar_flux_data/daily_flux_values/fluxtable.txt`, text whitespace-delimited, fără parametri. Se folosește ultima valoare *fluxadjflux* (F10.7 corectat la 1 UA) validă. Este preferat pentru SFI.
+* **HamQSL (N0NBH)** — `https://www.hamqsl.com/solarxml.php`, XML public actualizat orar, gândit pentru software de radioamatorism. Completează A index, X-ray (convertit din notația pe clase NOAA, ex. `M1.8` → W/m²), flux de protoni/electroni, viteza vântului solar și Bz — metrici pentru care NOAA era altfel singura sursă. Doar completează valorile pe care NOAA nu le-a putut furniza, nu le suprascrie pe cele reușite (spre deosebire de SILSO/GFZ/NRCan, care sunt agenții oficiale de măsurare și au prioritate față de copia NOAA). Câmpul `aurora` din acest flux e un indice de activitate 1–10 fără legătură cu procentul OVATION afișat ca „Auroral Activity” în altă parte, așa că nu este citit.
 
-Nu există chei API hardcodate și nu se face scraping HTML. NOAA completează indici de vânt solar/GOES pe care ceilalți furnizori nu îi oferă; SILSO validează/completează SSN, GFZ validează/completează Kp și oferă Ap, iar NRCan validează/completează SFI. Dacă un furnizor sau un produs individual răspunde cu timeout, eroare HTTP ori conținut neparsabil, celelalte produse continuă — fiecare cerere are o singură reîncercare cu backoff scurt înainte să fie considerată eșuată. Panoul păstrează ultima citire validă dacă nu se poate obține nicio valoare nouă.
+Nu există chei API hardcodate și nu se face scraping HTML. NOAA completează indici de vânt solar/GOES pe care ceilalți furnizori nu îi oferă; SILSO validează/completează SSN, GFZ validează/completează Kp și oferă Ap, NRCan validează/completează SFI, iar HamQSL umple golurile rămase când NOAA e indisponibil. Dacă un furnizor sau un produs individual răspunde cu timeout, eroare HTTP ori conținut neparsabil, celelalte produse continuă — fiecare cerere are o singură reîncercare cu backoff scurt înainte să fie considerată eșuată. Panoul păstrează ultima citire validă dacă nu se poate obține nicio valoare nouă. Auroral Activity, Bt, densitatea și temperatura vântului solar rămân „N/A” dacă NOAA e indisponibil — nu există azi o alternativă verificată pentru ele.
 
 NOAA SWPC este protejat de o verificare anti-bot (AWS WAF) care respinge clienții HTTP obișnuiți, indiferent de header-e, cu un răspuns gol — un browser real trece, `curl` sau Python simplu nu. Clienții acestui modul folosesc [`curl_cffi`](https://github.com/lexiforest/curl_cffi) cu `impersonate="chrome"`, care reproduce amprenta TLS/HTTP2 a lui Chrome, pentru a trece de această verificare; nu e o garanție universală, doar cel mai bun răspuns disponibil fără un browser real cu JavaScript.
 
@@ -231,7 +232,7 @@ call_book/                           pachetul aplicației
   services/propagation_service.py    reguli testabile pentru sugestia automată de propagare
   services/propagation_estimator.py  estimare orientativă zi/noapte pentru benzile HF
   services/propagation_cache.py      cache local pentru datele meteo spațiale
-  services/space_weather_service.py  clienți NOAA/SILSO/GFZ/NRCan
+  services/space_weather_service.py  clienți NOAA/SILSO/GFZ/NRCan/HamQSL
   ui/                                 interfața PySide6 / Qt for Python
 tests/                                teste unittest (vezi mai jos)
 data/ exports/ backups/ cache/        date runtime (negestionate în Git)

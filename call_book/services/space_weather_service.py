@@ -2,9 +2,10 @@
 
 Each provider is optional: NOAA SWPC supplies near-real-time solar-wind and
 GOES products, SILSO supplies the official daily sunspot number, GFZ supplies
-Kp/Ap nowcast, and NRCan (Space Weather Canada) supplies the F10.7 solar
-flux index as an alternative to NOAA's own copy.  No credentials or personal
-data are sent.
+Kp/Ap nowcast, NRCan (Space Weather Canada) supplies the F10.7 solar flux
+index as an alternative to NOAA's own copy, and HamQSL (N0NBH) fills gaps in
+NOAA's GOES/solar-wind metrics when NOAA itself cannot be reached.  No
+credentials or personal data are sent.
 """
 
 from __future__ import annotations
@@ -13,9 +14,11 @@ import csv
 import io
 import json
 import logging
+import re
 import time
 from datetime import UTC, datetime
 from typing import Any
+from xml.etree import ElementTree
 
 from curl_cffi import requests as curl_requests
 
@@ -42,6 +45,8 @@ NOAA_FALLBACK_ENDPOINTS = {
 SILSO_ENDPOINT = "https://www.sidc.be/SILSO/INFO/sndtotcsv.php"
 GFZ_ENDPOINT = "https://kp.gfz-potsdam.de/app/files/Kp_ap_nowcast.txt"
 NRCAN_ENDPOINT = "https://spaceweather.gc.ca/solar_flux_data/daily_flux_values/fluxtable.txt"
+HAMQSL_ENDPOINT = "https://www.hamqsl.com/solarxml.php"
+_XRAY_CLASS_EXPONENTS = {"A": -8, "B": -7, "C": -6, "M": -5, "X": -4}
 LOG = logging.getLogger(__name__)
 # SILSO's daily sunspot-number feed is the full series back to 1818 (not a
 # recent window like the other providers), several megabytes on its own; the
@@ -174,6 +179,49 @@ def parse_nrcan_solar_flux(payload: str) -> float | None:
         if value is not None and value >= 0:
             return value
     return None
+
+
+def _parse_xray_class(text: str) -> float | None:
+    """Convert NOAA-style X-ray class notation (e.g. "M1.8") to W/m²."""
+    match = re.fullmatch(r"([ABCMX])(\d+(?:\.\d+)?)", text.strip().upper())
+    if not match:
+        return None
+    letter, multiplier = match.groups()
+    return float(multiplier) * (10 ** _XRAY_CLASS_EXPONENTS[letter])
+
+
+def parse_hamqsl_solar_xml(payload: str) -> dict[str, float | None]:
+    """Read supplementary metrics from HamQSL's N0NBH ham-radio feed.
+
+    HamQSL (hamqsl.com/solarxml.php) is a ham-radio-oriented aggregator, not
+    behind NOAA's AWS WAF, that republishes A index, X-ray flux (as a letter
+    class like "M1.8", converted here to W/m²), proton/electron flux, solar
+    wind speed, and the interplanetary Bz — metrics NOAA is otherwise the
+    sole source for. Its "aurora" field is a different, unitless 1-10
+    activity index, not the OVATION percentage this app displays elsewhere
+    as auroral_activity, so it is deliberately not read here.
+    """
+    try:
+        root = ElementTree.fromstring(payload)
+    except ElementTree.ParseError:
+        return {}
+    data = root.find("solardata")
+    if data is None:
+        return {}
+
+    def read(tag: str) -> str | None:
+        element = data.find(tag)
+        return element.text.strip() if element is not None and element.text else None
+
+    xray_text = read("xray")
+    return {
+        "a_index": _number(read("aindex")),
+        "xray_flux": _parse_xray_class(xray_text) if xray_text else None,
+        "proton_flux": _number(read("protonflux")),
+        "electron_flux": _number(read("electonflux")),  # "electon" is HamQSL's own tag spelling
+        "solar_wind_speed": _number(read("solarwind")),
+        "bz": _number(read("magneticfield")),
+    }
 
 
 class SpaceWeatherService:
@@ -314,6 +362,13 @@ class SpaceWeatherService:
             nrcan_flux = None
             statuses["NRCan"] = "unavailable"
             LOG.warning("NRCan indisponibil: %s", exc)
+        try:
+            hamqsl = parse_hamqsl_solar_xml(self._get(HAMQSL_ENDPOINT, as_json=False))
+            statuses["HamQSL"] = "available" if any(v is not None for v in hamqsl.values()) else "no valid value"
+        except Exception as exc:
+            hamqsl = {}
+            statuses["HamQSL"] = "unavailable"
+            LOG.warning("HamQSL indisponibil: %s", exc)
         units = {
             "kp_index": "Kp",
             "a_index": "A",
@@ -347,6 +402,14 @@ class SpaceWeatherService:
         if nrcan_flux is not None:
             selected["solar_flux"] = nrcan_flux
             sources["solar_flux"] = "Space Weather Canada (NRCan)"
+        # Unlike SILSO/GFZ/NRCan (official measuring agencies, preferred over
+        # NOAA's copy), HamQSL is a third-party aggregator of NOAA's own data;
+        # it only fills gaps NOAA itself could not, never overrides a value
+        # NOAA did supply.
+        for key, value in hamqsl.items():
+            if value is not None and selected.get(key) is None:
+                selected[key] = value
+                sources[key] = "HamQSL (N0NBH)"
         selected["dynamic_pressure"] = None
         if not any(value is not None for value in selected.values()):
             raise SpaceWeatherError("Niciun furnizor de date nu a răspuns cu valori valide.")
