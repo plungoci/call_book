@@ -11,24 +11,14 @@ import csv
 import io
 import json
 import logging
-import ssl
 import time
 from datetime import UTC, datetime
 from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
-import certifi
+from curl_cffi import requests as curl_requests
 
 from ..propagation_models import SpaceWeatherData, WeatherValue
 from .propagation_cache import PropagationCache
-
-# Some Python-on-Windows installs ship an incomplete default certificate
-# store, causing "CERTIFICATE_VERIFY_FAILED: unable to get local issuer
-# certificate" for otherwise valid providers even though the same host
-# works fine in a browser.  Pinning certifi's actively maintained CA bundle
-# avoids depending on the OS/interpreter's own (possibly stale) trust store.
-_SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
 
 NOAA_ENDPOINTS = {
     "kp": "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json",
@@ -183,27 +173,18 @@ class SpaceWeatherService:
                     response.raise_for_status()
                     raw = response.raw.read(_MAX_RESPONSE_BYTES + 1)
                 else:
-                    with urlopen(
-                        # A custom "RadioLogbook/1.0" User-Agent came back as a
-                        # silent HTTP 200 with an empty body from NOAA — a common
-                        # signature of bot-management silently dropping traffic
-                        # from clients that don't look like a browser. A standard
-                        # browser-shaped string avoids that class of soft block.
-                        Request(
-                            url,
-                            headers={
-                                "Accept": "application/json, text/plain",
-                                "User-Agent": (
-                                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                                    "Chrome/124.0.0.0 Safari/537.36"
-                                ),
-                            },
-                        ),
-                        timeout=20,
-                        context=_SSL_CONTEXT,
-                    ) as response:
-                        raw = response.read(_MAX_RESPONSE_BYTES + 1)
+                    # NOAA SWPC sits behind an AWS WAF bot-management challenge
+                    # that answers any plain HTTP client — confirmed with both
+                    # curl and this app's own urlopen(), regardless of headers —
+                    # with an empty HTTP 202 ("x-amzn-waf-action: challenge"),
+                    # while a real browser gets the actual data. curl_cffi
+                    # impersonates Chrome's TLS/HTTP2 fingerprint, which plain
+                    # header changes cannot do, to get past that check.
+                    response = curl_requests.get(
+                        url, headers={"Accept": "application/json, text/plain"}, timeout=20, impersonate="chrome"
+                    )
+                    response.raise_for_status()
+                    raw = response.content[: _MAX_RESPONSE_BYTES + 1]
                 if len(raw) > _MAX_RESPONSE_BYTES:
                     snippet = raw[:200].decode("utf-8-sig", errors="replace").replace("\n", " ")
                     raise SpaceWeatherError(f"Răspuns prea mare — conținut primit: {snippet!r}")
@@ -218,14 +199,8 @@ class SpaceWeatherService:
                     # snippet lets that be told apart from a genuinely broken feed.
                     snippet = text[:200].replace("\n", " ") or "<gol>"
                     raise SpaceWeatherError(f"{exc} — conținut primit: {snippet!r}") from exc
-            except HTTPError as exc:
-                # 404 is not retried; 429 is retried once with backoff, never fatal to other providers.
-                last = exc
-                if exc.code == 404:
-                    break
             except (
-                URLError,
-                OSError,
+                OSError,  # covers both requests' and curl_cffi's HTTPError/ConnectionError/Timeout hierarchies
                 UnicodeDecodeError,
                 SpaceWeatherError,
                 AttributeError,
