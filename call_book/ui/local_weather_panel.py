@@ -46,7 +46,7 @@ class LocalWeatherPanel(QGroupBox):
         form.addRow("Temperatură", self.temperature_label)
         form.addRow("Umiditate", self.humidity_label)
         form.addRow("Condiții", self.condition_label)
-        form.addRow("Presiune atmosferică", self.pressure_label)
+        form.addRow("Presiune aeroport Sibiu", self.pressure_label)
         form.addRow("Vânt aeroport Sibiu", self.wind_label)
         form.addRow("Direcție vânt", self.wind_direction_label)
         layout.addLayout(form)

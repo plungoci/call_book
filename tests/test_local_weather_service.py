@@ -23,7 +23,7 @@ class LocalWeatherServiceTests(TestCase):
             b'"pressure_msl": 1017.6}, '
             b'"current_units": {"temperature_2m": "\xc2\xb0C"}}'
         )
-        metar_payload = b'[{"icaoId": "LRSB", "wspd": 12, "wdir": 270}]'
+        metar_payload = b'[{"icaoId": "LRSB", "altim": 1017.6, "wspd": 12, "wdir": 270}]'
         with patch(
             "call_book.services.local_weather_service.curl_requests.get",
             side_effect=(FakeResponse(payload), FakeResponse(metar_payload)),
@@ -38,7 +38,7 @@ class LocalWeatherServiceTests(TestCase):
         self.assertAlmostEqual(result.wind_speed_kmh or 0, 22.224)
         self.assertEqual(mock_get.call_args_list[0].kwargs.get("impersonate"), "chrome")
         self.assertEqual(mock_get.call_args_list[0].kwargs["params"]["latitude"], "46.7700")
-        self.assertIn("pressure_msl", mock_get.call_args_list[0].kwargs["params"]["current"])
+        self.assertNotIn("pressure_msl", mock_get.call_args_list[0].kwargs["params"]["current"])
         self.assertEqual(mock_get.call_args_list[1].kwargs["params"]["ids"], "LRSB")
 
     def test_fetch_raises_when_response_has_no_current_block(self) -> None:
@@ -67,7 +67,7 @@ class LocalWeatherServiceTests(TestCase):
             result = LocalWeatherService().fetch(46.77, 23.6)
         self.assertIsNone(result.condition)
 
-    def test_unavailable_metar_leaves_wind_unset(self) -> None:
+    def test_unavailable_metar_leaves_pressure_and_wind_unset(self) -> None:
         weather = FakeResponse(b'{"current": {"temperature_2m": 10, "relative_humidity_2m": 40, "weather_code": 0}}')
         with patch(
             "call_book.services.local_weather_service.curl_requests.get",
@@ -77,3 +77,4 @@ class LocalWeatherServiceTests(TestCase):
         self.assertIsNone(result.wind_speed_knots)
         self.assertIsNone(result.wind_speed_kmh)
         self.assertIsNone(result.wind_direction_degrees)
+        self.assertIsNone(result.atmospheric_pressure_hpa)
