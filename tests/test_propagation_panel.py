@@ -140,7 +140,18 @@ class PropagationEstimatorTests(TestCase):
 
     def test_institutional_text_parsers_use_latest_valid_values(self) -> None:
         self.assertEqual(parse_silso_daily_csv("# header\n2025; 1; 1; 2025.0; 99; 2; 1\n"), 99)
-        self.assertEqual(parse_gfz_nowcast("# header\n2025 01 01 00 2.3 12\n"), (2.3, 12))
+        # Real rows are "YYYY MM DD hh.h hh._m days days_m Kp ap D" (10 columns).
+        self.assertEqual(parse_gfz_nowcast("# header\n2026 07 30 18.0 18.250 34333 34333.760 2.3 12 1\n"), (2.3, 12))
+
+    def test_gfz_nowcast_skips_missing_data_sentinel_rows(self) -> None:
+        # Regression test: GFZ marks a missing reading as Kp=-1.000/ap=-1 (its
+        # documented sentinel), and the trailing D (definitive-data) flag was
+        # previously misread as ap, and ap misread as Kp. Both bugs produced a
+        # plausible-looking but wrong "K Index: -1.0 / Ap: 0.0" in the UI.
+        payload = (
+            "2026 07 30 15.0 15.250 34333 34333.635 2.7 12 1\n2026 07 30 21.0 21.250 34333 34333.885 -1.000 -1 0\n"
+        )
+        self.assertEqual(parse_gfz_nowcast(payload), (2.7, 12))
 
     def test_band_detector_covers_requested_hf_vhf_and_uhf_bands(self) -> None:
         cases = (

@@ -145,14 +145,23 @@ def parse_silso_daily_csv(payload: str) -> float | None:
 
 
 def parse_gfz_nowcast(payload: str) -> tuple[float | None, float | None]:
-    """Read final numeric Kp and ap columns from GFZ's whitespace nowcast text."""
+    """Read the latest valid Kp/ap columns from GFZ's whitespace nowcast text.
+
+    Each data row is "YYYY MM DD hh.h hh._m days days_m Kp ap D" (10 columns);
+    Kp/ap are the 8th/9th fields, not simply the last two — the trailing D
+    (definitive-data) flag was previously misread as ap, and ap misread as
+    Kp. GFZ marks missing readings with the sentinel values Kp=-1.000 and
+    ap=-1, which must be skipped in favour of an earlier row rather than
+    surfaced as real data.
+    """
     for line in reversed(payload.splitlines()):
         parts = line.split()
-        if len(parts) >= 2 and parts[0][:4].isdigit():
-            numbers = [_number(part) for part in parts]
-            numbers = [n for n in numbers if n is not None]
-            if len(numbers) >= 2:
-                return numbers[-2], numbers[-1]
+        if len(parts) < 10 or not parts[0][:4].isdigit():
+            continue
+        numbers = [_number(part) for part in parts]
+        kp, ap = numbers[-3], numbers[-2]
+        if kp is not None and kp >= 0 and ap is not None and ap >= 0:
+            return kp, ap
     return None, None
 
 
