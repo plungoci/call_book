@@ -13,26 +13,15 @@ from .models import QSO
 HEADERS = [
     "ID",
     "Callsign",
-    "Start UTC",
-    "End UTC",
     "Frequency MHz",
     "Band",
     "Mode",
     "Repeater ID",
-    "RST Sent",
-    "RST Received",
     "Name",
     "Grid",
-    "Power W",
     "Propagare",
-    "Satelit",
-    "Uplink",
-    "Downlink",
-    "Distanță",
-    "Azimut",
     "Observații propagare",
     "Notes",
-    "QSL",
 ]
 
 
@@ -51,26 +40,15 @@ def export_excel(qsos: list[QSO], directory: Path = Path("exports"), destination
             [
                 q.id,
                 q.callsign,
-                q.qso_start_utc,
-                q.qso_end_utc,
                 q.frequency_mhz,
                 q.band,
                 q.mode,
                 q.repeater_id,
-                q.rst_sent,
-                q.rst_received,
                 q.operator_name,
                 q.grid_square,
-                q.power_w,
                 q.propagation_mode,
-                q.satellite_name,
-                q.uplink_mode,
-                q.downlink_mode,
-                q.distance_km,
-                q.azimuth_deg,
                 q.propagation_notes,
                 q.notes,
-                q.qsl_status,
             ]
         )
     ws.freeze_panes = "A2"

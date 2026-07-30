@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import contextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .models import QSO, OperatorProfile, Repeater
@@ -133,9 +133,8 @@ CREATE TABLE IF NOT EXISTS operator_profile (
 
     def save_qso(self, q: QSO) -> int:
         fields = (
-            "callsign,qso_start_utc,qso_end_utc,frequency_mhz,band,mode,repeater_id,rst_sent,rst_received,"
-            "operator_name,grid_square,my_grid_square,power_w,notes,qsl_status,propagation_mode,satellite_name,"
-            "uplink_mode,downlink_mode,distance_km,azimuth_deg,propagation_notes"
+            "callsign,frequency_mhz,band,mode,repeater_id,operator_name,grid_square,my_grid_square,notes,"
+            "propagation_mode,propagation_notes"
         )
         vals = [getattr(q, x) for x in fields.split(",")]
         now = datetime.now(UTC).isoformat()
@@ -146,8 +145,13 @@ CREATE TABLE IF NOT EXISTS operator_profile (
                     vals + [now, q.id],
                 )
                 return q.id
+            # qso_start_utc has no per-QSO equivalent anymore (the start/end time
+            # fields were removed from the model and UI); it keeps satisfying its
+            # NOT NULL constraint on existing databases by mirroring created_at,
+            # so sorting/date-range filtering against it keeps working unchanged.
             cur = c.execute(
-                f"INSERT INTO qsos ({fields},created_at) VALUES ({','.join('?' * (len(vals) + 1))})", vals + [now]
+                f"INSERT INTO qsos ({fields},qso_start_utc,created_at) VALUES ({','.join('?' * (len(vals) + 2))})",
+                vals + [now, now],
             )
             return cur.lastrowid
 
@@ -180,15 +184,12 @@ CREATE TABLE IF NOT EXISTS operator_profile (
             return c.execute(sql, values).fetchall()
 
     def possible_duplicate(self, q: QSO) -> bool:
-        start = (datetime.fromisoformat(q.qso_start_utc) - timedelta(minutes=2)).isoformat()
-        end = (datetime.fromisoformat(q.qso_start_utc) + timedelta(minutes=2)).isoformat()
-        sql = "SELECT 1 FROM qsos WHERE callsign=? AND frequency_mhz=? AND mode=? AND qso_start_utc BETWEEN ? AND ?" + (
-            " AND id != ?" if q.id else ""
-        )
+        # No per-QSO time is tracked anymore, so duplicates are now matched on
+        # callsign/frequency/mode alone rather than within a time window.
+        sql = "SELECT 1 FROM qsos WHERE callsign=? AND frequency_mhz=? AND mode=?" + (" AND id != ?" if q.id else "")
         with self.connect() as c:
             return (
-                c.execute(sql, [q.callsign, q.frequency_mhz, q.mode, start, end] + ([q.id] if q.id else [])).fetchone()
-                is not None
+                c.execute(sql, [q.callsign, q.frequency_mhz, q.mode] + ([q.id] if q.id else [])).fetchone() is not None
             )
 
     def delete_qso(self, id: int):

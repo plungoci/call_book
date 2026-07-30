@@ -23,9 +23,6 @@ class LogbookController:
         is_edit = qso.id is not None
         if not is_edit:
             qso.my_grid_square = self.database.get_operator_profile().grid_square
-        # A newly opened form already records its start time.  Reusing it avoids
-        # a clock rounding race where an auto-filled end time precedes the start.
-        qso.qso_end_utc = qso.qso_end_utc or qso.qso_start_utc
         validate_qso(qso)
         if self.database.possible_duplicate(qso) and not confirm_duplicate(qso):
             raise DuplicateQsoCancelled()

@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .models import QSO, OperatorProfile
 from .propagation import ADIF_PROPAGATION_MODES
-
-QSL_MAP = {"NOT_SENT": ("N", "N"), "SENT": ("Y", "N"), "RECEIVED": ("N", "Y"), "CONFIRMED": ("Y", "Y")}
 
 
 def adif_field(name: str, value: object) -> str:
@@ -17,27 +15,20 @@ def adif_field(name: str, value: object) -> str:
 
 
 def adif_record(q: QSO, profile: OperatorProfile | None = None) -> str:
-    start = datetime.fromisoformat(q.qso_start_utc)
-    end = datetime.fromisoformat(q.qso_end_utc) if q.qso_end_utc else None
-    sent, received = QSL_MAP.get(q.qsl_status, ("N", "N"))
+    # QSO_DATE/TIME_ON are mandatory ADIF fields; per-QSO start/end times were
+    # removed from the model, so the log timestamp is used instead.
+    logged = datetime.fromisoformat(q.created_at) if q.created_at else datetime.now(UTC)
     values = {
         "CALL": q.callsign,
-        "QSO_DATE": start.strftime("%Y%m%d"),
-        "TIME_ON": start.strftime("%H%M%S"),
+        "QSO_DATE": logged.strftime("%Y%m%d"),
+        "TIME_ON": logged.strftime("%H%M%S"),
         "FREQ": f"{q.frequency_mhz:.6f}",
         "BAND": q.band,
         "MODE": q.mode,
-        "RST_SENT": q.rst_sent,
-        "RST_RCVD": q.rst_received,
         "NAME": q.operator_name,
         "GRIDSQUARE": q.grid_square,
-        "TX_PWR": q.power_w,
         "COMMENT": q.notes,
-        "QSL_SENT": sent,
-        "QSL_RCVD": received,
     }
-    if end:
-        values["TIME_OFF"] = end.strftime("%H%M%S")
     if q.my_grid_square:
         values["MY_GRIDSQUARE"] = q.my_grid_square
     elif profile and profile.grid_square:
@@ -46,12 +37,6 @@ def adif_record(q: QSO, profile: OperatorProfile | None = None) -> str:
         values["STATION_CALLSIGN"] = profile.callsign
     if q.propagation_mode in ADIF_PROPAGATION_MODES:
         values["PROP_MODE"] = ADIF_PROPAGATION_MODES[q.propagation_mode]
-    if q.satellite_name:
-        values["SAT_NAME"] = q.satellite_name
-    if q.uplink_mode or q.downlink_mode:
-        values["SAT_MODE"] = "/".join(x for x in (q.uplink_mode, q.downlink_mode) if x)
-    if q.distance_km is not None:
-        values["DISTANCE"] = f"{q.distance_km:g}"
     # ADIF has only one general comment field; preserve existing QSO notes first.
     if q.propagation_notes:
         values["COMMENT"] = "\n".join(x for x in (q.notes, q.propagation_notes) if x)

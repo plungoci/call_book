@@ -30,13 +30,7 @@ from call_book.validators import (
 
 class LogbookTests(unittest.TestCase):
     def qso(self, **changes: Any) -> QSO:
-        values: dict[str, Any] = dict(
-            callsign="yo3abc/p",
-            qso_start_utc="2026-01-01T12:00:00+00:00",
-            qso_end_utc="2026-01-01T12:01:00+00:00",
-            frequency_mhz=145.5,
-            mode="FM",
-        )
+        values: dict[str, Any] = dict(callsign="yo3abc/p", frequency_mhz=145.5, mode="FM")
         values.update(changes)
         return QSO(**values)
 
@@ -57,10 +51,6 @@ class LogbookTests(unittest.TestCase):
     def test_bands(self):
         self.assertEqual(band_for_frequency(145.5), "2m")
         self.assertEqual(band_for_frequency(999), "Unknown")
-
-    def test_time_interval(self):
-        with self.assertRaises(ValueError):
-            validate_qso(self.qso(qso_end_utc="2026-01-01T11:00:00+00:00"))
 
     def test_qso_table_dates_show_local_time_and_utc_values(self):
         local_time, utc_date, utc_time = qso_table_dates("2026-01-01T23:15:30+00:00")
@@ -106,39 +96,18 @@ class LogbookTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             db = Database(Path(tmp) / "test.db")
             first = db.save_qso(validate_qso(self.qso()))
-            second = db.save_qso(
-                validate_qso(
-                    self.qso(qso_start_utc="2026-01-02T12:00:00+00:00", qso_end_utc="2026-01-02T12:01:00+00:00")
-                )
-            )
+            second = db.save_qso(validate_qso(self.qso(callsign="yo3xyz")))
             db.delete_qso(second)
             db.reset_id_sequences()
-            self.assertEqual(
-                db.save_qso(
-                    validate_qso(
-                        self.qso(qso_start_utc="2026-01-03T12:00:00+00:00", qso_end_utc="2026-01-03T12:01:00+00:00")
-                    )
-                ),
-                first + 1,
-            )
+            self.assertEqual(db.save_qso(validate_qso(self.qso(callsign="yo3def"))), first + 1)
 
     def test_propagation_crud_and_delete(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = Database(Path(tmp) / "test.db")
-            q = validate_qso(
-                self.qso(
-                    propagation_mode="Satelit",
-                    satellite_name="QO-100",
-                    uplink_mode="SSB",
-                    downlink_mode="SSB",
-                    distance_km=35786.5,
-                    azimuth_deg=180,
-                    propagation_notes="QSB",
-                )
-            )
+            q = validate_qso(self.qso(propagation_mode="Satelit", propagation_notes="QSB"))
             ident = db.save_qso(q)
             saved = db.get_qso(ident)
-            self.assertEqual((saved.satellite_name, saved.distance_km, saved.azimuth_deg), ("QO-100", 35786.5, 180))
+            self.assertEqual(saved.propagation_notes, "QSB")
             saved.propagation_notes = "edited"
             db.save_qso(saved)
             self.assertEqual(db.get_qso(ident).propagation_notes, "edited")
@@ -148,44 +117,21 @@ class LogbookTests(unittest.TestCase):
 
     def test_propagation_validation(self):
         with self.assertRaises(ValueError):
-            validate_qso(self.qso(distance_km=0))
-        with self.assertRaises(ValueError):
-            validate_qso(self.qso(azimuth_deg=361))
-        with self.assertRaises(ValueError):
-            validate_qso(self.qso(propagation_mode="Satelit"))
-        self.assertEqual(
-            validate_qso(
-                self.qso(propagation_mode="Satelit", satellite_name="QO-100", uplink_mode="SSB", downlink_mode="SSB")
-            ).satellite_name,
-            "QO-100",
-        )
+            validate_qso(self.qso(propagation_mode="Nu există"))
+        self.assertEqual(validate_qso(self.qso(propagation_mode="Satelit")).propagation_mode, "Satelit")
 
     def test_propagation_exports(self):
-        q = validate_qso(
-            self.qso(
-                propagation_mode="Satelit",
-                satellite_name="QO-100",
-                uplink_mode="SSB",
-                downlink_mode="USB",
-                distance_km=35786.5,
-                azimuth_deg=145,
-                propagation_notes="Deschidere excelentă",
-            )
-        )
+        q = validate_qso(self.qso(propagation_mode="Satelit", propagation_notes="Deschidere excelentă"))
         record = adif_record(q)
         self.assertIn("<PROP_MODE:3>SAT", record)
-        self.assertIn("<SAT_NAME:6>QO-100", record)
-        self.assertIn("<SAT_MODE:7>SSB/USB", record)
-        self.assertIn("<DISTANCE:7>35786.5", record)
         self.assertIn("Deschidere excelentă", record)
         with tempfile.TemporaryDirectory() as tmp:
             from openpyxl import load_workbook
 
             path = export_excel([q], destination=Path(tmp) / "qsos.xlsx")
             ws = load_workbook(path).active
-            self.assertEqual(ws[1][13].value, "Propagare")
-            self.assertEqual(ws[2][13].value, "Satelit")
-            self.assertEqual(ws[2][18].value, 145)
+            self.assertEqual(ws[1][8].value, "Propagare")
+            self.assertEqual(ws[2][8].value, "Satelit")
 
     def test_operator_profile_save_and_load(self):
         with tempfile.TemporaryDirectory() as tmp:
