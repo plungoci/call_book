@@ -11,6 +11,7 @@ requires-python = ">=3.11"
 dependencies = [
     "PySide6>=6.7,<7",
     "openpyxl>=3.1,<4",
+    "certifi>=2024.2.2",
 ]
 
 [tool.setuptools.packages.find]
