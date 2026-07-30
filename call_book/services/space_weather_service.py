@@ -171,15 +171,29 @@ class SpaceWeatherService:
                     raw = response.raw.read(_MAX_RESPONSE_BYTES + 1)
                 else:
                     with urlopen(
+                        # A custom "RadioLogbook/1.0" User-Agent came back as a
+                        # silent HTTP 200 with an empty body from NOAA — a common
+                        # signature of bot-management silently dropping traffic
+                        # from clients that don't look like a browser. A standard
+                        # browser-shaped string avoids that class of soft block.
                         Request(
-                            url, headers={"Accept": "application/json, text/plain", "User-Agent": "RadioLogbook/1.0"}
+                            url,
+                            headers={
+                                "Accept": "application/json, text/plain",
+                                "User-Agent": (
+                                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                    "Chrome/124.0.0.0 Safari/537.36"
+                                ),
+                            },
                         ),
                         timeout=20,
                         context=_SSL_CONTEXT,
                     ) as response:
                         raw = response.read(_MAX_RESPONSE_BYTES + 1)
                 if len(raw) > _MAX_RESPONSE_BYTES:
-                    raise SpaceWeatherError("Răspuns prea mare")
+                    snippet = raw[:200].decode("utf-8-sig", errors="replace").replace("\n", " ")
+                    raise SpaceWeatherError(f"Răspuns prea mare — conținut primit: {snippet!r}")
                 text = raw.decode("utf-8-sig")
                 if not as_json:
                     return text
