@@ -56,18 +56,14 @@ class SpaceWeatherTests(TestCase):
         # "Expecting value: line 1 column 1 (char 0)", indistinguishable from
         # a genuinely broken feed. The response body must now be visible too.
         class FakeResponse:
-            def __enter__(self):
-                return self
+            content = b"<html>blocked</html>"
 
-            def __exit__(self, *exc_info):
-                return False
-
-            def read(self, _n):
-                return b"<html>blocked</html>"
+            def raise_for_status(self):
+                pass
 
         with (
             TemporaryDirectory() as directory,
-            patch("call_book.services.space_weather_service.urlopen", return_value=FakeResponse()),
+            patch("call_book.services.space_weather_service.curl_requests.get", return_value=FakeResponse()),
         ):
             service = SpaceWeatherService(PropagationCache(Path(directory)))
             with self.assertRaises(SpaceWeatherError) as ctx:
@@ -80,23 +76,42 @@ class SpaceWeatherTests(TestCase):
         # previously raised a bare "Răspuns prea mare" with no way to tell a
         # block page apart from a provider that genuinely changed its format.
         class FakeResponse:
-            def __enter__(self):
-                return self
+            content = b"<html>blocked page too large" + b" filler" * 1_200_000
 
-            def __exit__(self, *exc_info):
-                return False
-
-            def read(self, _n):
-                return b"<html>blocked page too large" + b" filler" * 1_200_000
+            def raise_for_status(self):
+                pass
 
         with (
             TemporaryDirectory() as directory,
-            patch("call_book.services.space_weather_service.urlopen", return_value=FakeResponse()),
+            patch("call_book.services.space_weather_service.curl_requests.get", return_value=FakeResponse()),
         ):
             service = SpaceWeatherService(PropagationCache(Path(directory)))
             with self.assertRaises(SpaceWeatherError) as ctx:
                 service._get("https://example.invalid/data.csv", as_json=False)
             self.assertIn("blocked page too large", str(ctx.exception))
+
+    def test_get_impersonates_a_real_browser_to_get_past_noaas_bot_challenge(self) -> None:
+        # Regression test: NOAA SWPC sits behind an AWS WAF bot-management
+        # challenge that answers plain HTTP clients (verified with curl, not
+        # just this app) with an empty HTTP 202, regardless of headers — only
+        # a request whose TLS/HTTP2 fingerprint matches a real browser gets
+        # through. Losing the "impersonate=chrome" kwarg silently regresses to
+        # the empty-response bug even though the code still compiles and runs.
+        class FakeResponse:
+            content = b'{"ok": true}'
+
+            def raise_for_status(self):
+                pass
+
+        with (
+            TemporaryDirectory() as directory,
+            patch(
+                "call_book.services.space_weather_service.curl_requests.get", return_value=FakeResponse()
+            ) as mock_get,
+        ):
+            service = SpaceWeatherService(PropagationCache(Path(directory)))
+            service._get("https://example.invalid/data.json")
+            self.assertEqual(mock_get.call_args.kwargs.get("impersonate"), "chrome")
 
     def test_fetch_does_not_probe_a_raw_socket_before_the_real_request(self) -> None:
         # Regression test: a prior raw socket.create_connection() pre-check
