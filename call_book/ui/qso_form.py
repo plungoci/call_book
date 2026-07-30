@@ -22,6 +22,12 @@ from ..services.propagation_service import (
     suggest_propagation_mode,
 )
 from ..utils.text_formatters import format_callsign, format_grid_square, format_operator_name
+from .local_weather_panel import LocalWeatherPanel
+
+# Field values (callsigns, frequencies, band/mode names) are all short; a
+# fixed cap keeps the inputs a sensible size instead of stretching them to
+# fill the whole window width, leaving room for the weather panel beside them.
+_FIELD_MAX_WIDTH = 220
 
 MODES = (
     "FM",
@@ -93,9 +99,10 @@ def validate_field_labels() -> None:
 class QSOForm(QGroupBox):
     contextChanged = Signal(str, str)
 
-    def __init__(self, repeaters):
+    def __init__(self, repeaters, location_provider=None):
         super().__init__("QSO · toate orele sunt UTC")
         self.repeaters = repeaters
+        self.location_provider = location_provider or (lambda: (None, None))
         self.qso_id = None
         self.fields = {}
         self._loading = False
@@ -119,6 +126,9 @@ class QSOForm(QGroupBox):
                 widget.setToolTip(self._tooltip(key, label_text))
                 form.addRow(label_text, widget)
                 self.fields[key] = widget
+        self.weather_panel = LocalWeatherPanel(self.location_provider)
+        grid.addWidget(self.weather_panel, 0, len(FIELD_GROUPS))
+        grid.setColumnStretch(len(FIELD_GROUPS), 1)
 
         self.notes = QTextEdit()
         self.notes.setFixedHeight(72)
@@ -149,6 +159,7 @@ class QSOForm(QGroupBox):
 
     def _create_widget(self, key):
         widget = QComboBox() if key in COMBO_BOX_FIELDS else QLineEdit()
+        widget.setMaximumWidth(_FIELD_MAX_WIDTH)
         if not isinstance(widget, QComboBox):
             return widget
 
@@ -297,3 +308,6 @@ class QSOForm(QGroupBox):
             notes=self.notes.toPlainText(),
             propagation_mode=text("propagation_mode"),
         )
+
+    def shutdown(self):
+        self.weather_panel.shutdown()
