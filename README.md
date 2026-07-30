@@ -75,13 +75,13 @@ Antetul afișează titlul aplicației, locatorul stației (dacă e setat în pro
 
 ### Jurnal QSO
 
-**Filtre** — un rând de câmpuri text (**Indicativ**, **Bandă**, **Mod**, **Repetor ID**, **De la**, **Până la**) și butonul **Aplică filtre**. Filtrele rămân permanent vizibile; nu există un buton de resetare — golește manual câmpurile dorite și aplică din nou. **De la**/**Până la** filtrează după data/ora la care a fost înregistrat QSO-ul.
-
-**Formularul QSO** conține grupul **Legătură**: Indicativ, Nume, Repetor, Frecvență MHz, Bandă, Mod, Locator, Propagare, plus un câmp de **Observații**. Toate detaliile despre formatare, auto-completare și validare sunt în secțiunea [Formularul QSO](#formularul-qso).
+**Formularul QSO** conține grupul **Legătură**: Indicativ, Nume, Repetor, Frecvență MHz, Bandă, Mod, Locator, Propagare, plus un câmp de **Observații**. Toate detaliile despre formatare, auto-completare și validare sunt în secțiunea [Formularul QSO](#formularul-qso). În dreapta formularului, panoul **Vreme locală** — vezi [Vreme locală](#vreme-locală).
 
 **Acțiuni**: **Salvează QSO** (creează un QSO nou sau actualizează cel încărcat pentru editare — butonul nu își schimbă eticheta, comportamentul depinde de faptul că un QSO este sau nu încărcat), **QSO nou** (golește formularul; dacă erai în mijlocul unei editări, renunță la modificări fără să scrie în baza de date), **Editează** și **Șterge** (acționează asupra rândului selectat în tabel; dacă nu e nimic selectat, nu fac nimic). **Șterge** cere confirmare înainte de eliminarea definitivă.
 
-**Tabelul de QSO-uri** are 11 coloane: ID, Ora locală, Dată UTC, Ora UTC, Indicativ, Nume, Grid Square, MHz, Bandă, Mod, Repetor. Ora locală/UTC afișate provin din momentul la care a fost înregistrat QSO-ul.
+**Căutare** — un buton comutabil lângă acțiuni; ascunde/arată rândul de filtre (**Indicativ**, **Bandă**, **Mod**, **Repetor ID**, **De la**, **Până la**) și butonul **Aplică filtre**, ascunse implicit. Nu există un buton de resetare — golește manual câmpurile dorite și aplică din nou. **De la**/**Până la** filtrează după data/ora la care a fost înregistrat QSO-ul.
+
+**Tabelul de QSO-uri** are 11 coloane: ID, Ora locală, Dată UTC, Ora UTC, Indicativ, Nume, Grid Square, MHz, Bandă, Mod, Repetor, ordonate crescător după ID. Ora locală/UTC afișate provin din momentul la care a fost înregistrat QSO-ul.
 
 Bara de stare de sub tabel arată numărul de QSO-uri afișate sau confirmarea ultimei acțiuni (export, backup, resetare ID-uri etc.).
 
