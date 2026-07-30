@@ -8,11 +8,16 @@ operator profile.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 
 from curl_cffi import requests as curl_requests
 
 _ENDPOINT = "https://api.open-meteo.com/v1/forecast"
+_SIBIU_METAR_ENDPOINT = "https://aviationweather.gov/api/data/metar"
+_SIBIU_ICAO = "LRSB"
+
+LOG = logging.getLogger(__name__)
 
 # WMO weather interpretation codes, as returned by Open-Meteo's "weather_code".
 _CONDITIONS = {
@@ -56,6 +61,11 @@ class LocalWeatherData:
     temperature_c: float | None
     humidity_percent: float | None
     condition: str | None
+    wind_speed_knots: float | None = None
+
+    @property
+    def wind_speed_kmh(self) -> float | None:
+        return self.wind_speed_knots * 1.852 if self.wind_speed_knots is not None else None
 
 
 def _number(value: object) -> float | None:
@@ -89,4 +99,25 @@ class LocalWeatherService:
             temperature_c=_number(current.get("temperature_2m")),
             humidity_percent=_number(current.get("relative_humidity_2m")),
             condition=_CONDITIONS.get(int(code)) if code is not None else None,
+            wind_speed_knots=self._fetch_sibiu_airport_wind(timeout_seconds),
         )
+
+    @staticmethod
+    def _fetch_sibiu_airport_wind(timeout_seconds: float) -> float | None:
+        """Return the latest wind speed reported by Sibiu Airport's METAR."""
+        try:
+            response = curl_requests.get(
+                _SIBIU_METAR_ENDPOINT,
+                params={"ids": _SIBIU_ICAO, "format": "json", "taf": "false", "hours": "3"},
+                timeout=timeout_seconds,
+                impersonate="chrome",
+            )
+            response.raise_for_status()
+            reports = json.loads(response.content.decode("utf-8"))
+        except (curl_requests.errors.RequestsError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            LOG.warning("Vântul METAR pentru aeroportul Sibiu nu este disponibil: %s", exc)
+            return None
+
+        if not isinstance(reports, list) or not reports or not isinstance(reports[0], dict):
+            return None
+        return _number(reports[0].get("wspd"))

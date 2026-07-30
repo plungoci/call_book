@@ -22,15 +22,20 @@ class LocalWeatherServiceTests(TestCase):
             b'{"current": {"temperature_2m": 21.3, "relative_humidity_2m": 55, "weather_code": 3}, '
             b'"current_units": {"temperature_2m": "\xc2\xb0C"}}'
         )
+        metar_payload = b'[{"icaoId": "LRSB", "wspd": 12}]'
         with patch(
-            "call_book.services.local_weather_service.curl_requests.get", return_value=FakeResponse(payload)
+            "call_book.services.local_weather_service.curl_requests.get",
+            side_effect=(FakeResponse(payload), FakeResponse(metar_payload)),
         ) as mock_get:
             result = LocalWeatherService().fetch(46.77, 23.6)
         self.assertEqual(result.temperature_c, 21.3)
         self.assertEqual(result.humidity_percent, 55)
         self.assertEqual(result.condition, "Înnorat")
-        self.assertEqual(mock_get.call_args.kwargs.get("impersonate"), "chrome")
-        self.assertEqual(mock_get.call_args.kwargs["params"]["latitude"], "46.7700")
+        self.assertEqual(result.wind_speed_knots, 12)
+        self.assertAlmostEqual(result.wind_speed_kmh or 0, 22.224)
+        self.assertEqual(mock_get.call_args_list[0].kwargs.get("impersonate"), "chrome")
+        self.assertEqual(mock_get.call_args_list[0].kwargs["params"]["latitude"], "46.7700")
+        self.assertEqual(mock_get.call_args_list[1].kwargs["params"]["ids"], "LRSB")
 
     def test_fetch_raises_when_response_has_no_current_block(self) -> None:
         with (
@@ -57,3 +62,13 @@ class LocalWeatherServiceTests(TestCase):
         with patch("call_book.services.local_weather_service.curl_requests.get", return_value=FakeResponse(payload)):
             result = LocalWeatherService().fetch(46.77, 23.6)
         self.assertIsNone(result.condition)
+
+    def test_unavailable_metar_leaves_wind_unset(self) -> None:
+        weather = FakeResponse(b'{"current": {"temperature_2m": 10, "relative_humidity_2m": 40, "weather_code": 0}}')
+        with patch(
+            "call_book.services.local_weather_service.curl_requests.get",
+            side_effect=(weather, FakeResponse(b"[]")),
+        ):
+            result = LocalWeatherService().fetch(46.77, 23.6)
+        self.assertIsNone(result.wind_speed_knots)
+        self.assertIsNone(result.wind_speed_kmh)

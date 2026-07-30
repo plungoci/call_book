@@ -40,9 +40,11 @@ class LocalWeatherPanel(QGroupBox):
         self.temperature_label = QLabel("N/A")
         self.humidity_label = QLabel("N/A")
         self.condition_label = QLabel("N/A")
+        self.wind_label = QLabel("N/A")
         form.addRow("Temperatură", self.temperature_label)
         form.addRow("Umiditate", self.humidity_label)
         form.addRow("Condiții", self.condition_label)
+        form.addRow("Vânt aeroport Sibiu", self.wind_label)
         layout.addLayout(form)
         layout.addStretch()
 
@@ -68,6 +70,9 @@ class LocalWeatherPanel(QGroupBox):
         self.temperature_label.setText(f"{w.temperature_c:.1f} °C" if w.temperature_c is not None else "N/A")
         self.humidity_label.setText(f"{w.humidity_percent:.0f}%" if w.humidity_percent is not None else "N/A")
         self.condition_label.setText(w.condition or "N/A")
+        self.wind_label.setText(
+            f"{w.wind_speed_knots:.0f} kt / {w.wind_speed_kmh:.1f} km/h" if w.wind_speed_knots is not None else "N/A"
+        )
 
     def shutdown(self):
         if self._worker_thread is not None and self._worker_thread.isRunning():
