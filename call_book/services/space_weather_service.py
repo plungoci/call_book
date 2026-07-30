@@ -36,7 +36,6 @@ NOAA_ENDPOINTS = {
     # eventually exceed the client's safe response limit.
     "plasma": "https://services.swpc.noaa.gov/products/solar-wind/plasma-7-day.json",
     "magnetic": "https://services.swpc.noaa.gov/products/solar-wind/mag-7-day.json",
-    "aurora": "https://services.swpc.noaa.gov/json/ovation_aurora_latest.json",
     "alerts": "https://services.swpc.noaa.gov/products/alerts.json",
 }
 NOAA_FALLBACK_ENDPOINTS = {
@@ -122,11 +121,6 @@ def _observed_at(payload: Any, fields: tuple[str, ...], default: datetime) -> da
     return default
 
 
-def _aurora_probability(payload: Any) -> float | None:
-    values = [_number(row.get("probability", row.get("aurora"))) for row in _rows(payload)]
-    return max((v for v in values if v is not None), default=None)
-
-
 def _blackout(alerts: Any) -> str | None:
     text = json.dumps(alerts).upper()[:200_000]
     return next((level for level in ("R5", "R4", "R3", "R2", "R1") if "BLACKOUT" in text and level in text), None)
@@ -198,8 +192,8 @@ def parse_hamqsl_solar_xml(payload: str) -> dict[str, float | None]:
     class like "M1.8", converted here to W/m²), proton/electron flux, solar
     wind speed, and the interplanetary Bz — metrics NOAA is otherwise the
     sole source for. Its "aurora" field is a different, unitless 1-10
-    activity index, not the OVATION percentage this app displays elsewhere
-    as auroral_activity, so it is deliberately not read here.
+    activity index, not the OVATION percentage this app used to display, so
+    it is deliberately not read here.
     """
     try:
         root = ElementTree.fromstring(payload)
@@ -287,8 +281,8 @@ class SpaceWeatherService:
                 LOG.warning("NOAA %s indisponibil: %s", name, exc)
         requirements = {
             "kp": (("kp_index", "kp"), ("a_running", "a_index", "a")),
-            "plasma": (("speed",), ("density",), ("temperature",)),
-            "magnetic": (("bz_gsm", "bz"), ("bt", "bt_gsm")),
+            "plasma": (("speed",),),
+            "magnetic": (("bz_gsm", "bz"),),
         }
         for name, field_sets in requirements.items():
             if any(_latest(payloads.get(name), fields) is None for fields in field_sets):
@@ -308,9 +302,6 @@ class SpaceWeatherService:
                 self._noaa_observed[metric] = _observed_at(payloads[used], fields, datetime.now(UTC))
             return value
 
-        aurora = _aurora_probability(payloads.get("aurora"))
-        if aurora is not None:
-            self._noaa_sources["auroral_activity"] = "NOAA SWPC"
         result = {
             "kp_index": pick("kp_index", "kp", ("kp_index", "kp")),
             "a_index": pick("a_index", "kp", ("a_running", "a_index", "a")),
@@ -319,12 +310,8 @@ class SpaceWeatherService:
             "xray_flux": pick("xray_flux", "xray", ("observed_flux", "flux")),
             "proton_flux": pick("proton_flux", "proton", ("flux",)),
             "electron_flux": pick("electron_flux", "electron", ("flux",)),
-            "auroral_activity": aurora,
             "solar_wind_speed": pick("solar_wind_speed", "plasma", ("speed",)),
-            "solar_wind_density": pick("solar_wind_density", "plasma", ("density",)),
-            "solar_wind_temperature": pick("solar_wind_temperature", "plasma", ("temperature",)),
             "bz": pick("bz", "magnetic", ("bz_gsm", "bz")),
-            "bt": pick("bt", "magnetic", ("bt", "bt_gsm")),
             "radio_blackout_level": _blackout(payloads.get("alerts", [])),
         }
         if result["radio_blackout_level"] is not None:
@@ -378,12 +365,8 @@ class SpaceWeatherService:
             "xray_flux": "W/m²",
             "proton_flux": "pfu",
             "electron_flux": "particles/(cm²·s·sr)",
-            "auroral_activity": "%",
             "solar_wind_speed": "km/s",
-            "solar_wind_density": "p/cm³",
-            "solar_wind_temperature": "K",
             "bz": "nT",
-            "bt": "nT",
             "radio_blackout_level": "NOAA R",
         }
         selected = dict(noaa)
@@ -473,13 +456,9 @@ class SpaceWeatherService:
             "xray_flux",
             "proton_flux",
             "electron_flux",
-            "auroral_activity",
             "solar_wind_speed",
-            "solar_wind_density",
             "bz",
             "ap_index",
-            "bt",
-            "solar_wind_temperature",
             "dynamic_pressure",
         )
         # `names` is deliberately kept as one flat tuple so it stays in sync with
