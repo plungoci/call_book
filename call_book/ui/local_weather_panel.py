@@ -3,7 +3,7 @@
 import logging
 
 from PySide6.QtCore import QObject, QThread, Signal
-from PySide6.QtWidgets import QFormLayout, QGroupBox, QLabel, QVBoxLayout
+from PySide6.QtWidgets import QFormLayout, QGroupBox, QLabel, QPushButton, QVBoxLayout
 
 from ..services.local_weather_service import LocalWeatherService
 
@@ -46,7 +46,15 @@ class LocalWeatherPanel(QGroupBox):
         form.addRow("Condiții", self.condition_label)
         form.addRow("Vânt aeroport Sibiu", self.wind_label)
         layout.addLayout(form)
+        self.button = QPushButton("Actualizează")
+        self.button.clicked.connect(self.refresh)
+        self.button.hide()
+        layout.addWidget(self.button)
         layout.addStretch()
+
+    def set_manual_refresh_available(self, available):
+        """Show manual refresh only when periodic refreshing is disabled."""
+        self.button.setVisible(available)
 
     def refresh(self):
         latitude, longitude = self.location_provider()
