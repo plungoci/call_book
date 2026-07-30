@@ -74,6 +74,30 @@ class SpaceWeatherTests(TestCase):
                 service._get("https://example.invalid/data.json")
             self.assertIn("blocked", str(ctx.exception))
 
+    def test_get_reports_a_snippet_when_the_response_is_too_large(self) -> None:
+        # Regression test: an oversized response (e.g. a large HTML block page
+        # substituted by a firewall/proxy for the tiny expected CSV/text feed)
+        # previously raised a bare "Răspuns prea mare" with no way to tell a
+        # block page apart from a provider that genuinely changed its format.
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc_info):
+                return False
+
+            def read(self, _n):
+                return b"<html>blocked page too large" + b" filler" * 200_000
+
+        with (
+            TemporaryDirectory() as directory,
+            patch("call_book.services.space_weather_service.urlopen", return_value=FakeResponse()),
+        ):
+            service = SpaceWeatherService(PropagationCache(Path(directory)))
+            with self.assertRaises(SpaceWeatherError) as ctx:
+                service._get("https://example.invalid/data.csv", as_json=False)
+            self.assertIn("blocked page too large", str(ctx.exception))
+
     def test_fetch_does_not_probe_a_raw_socket_before_the_real_request(self) -> None:
         # Regression test: a prior raw socket.create_connection() pre-check
         # bypassed any HTTP(S) proxy that urlopen() itself would respect,
