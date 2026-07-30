@@ -55,6 +55,8 @@ Pentru actualizare automată, Git trebuie să fie instalat, iar proiectul trebui
 
 Antetul afișează simultan timpul local și UTC. **QSO nou** sau `Ctrl+N` resetează formularul. `Ctrl+S` salvează, `Ctrl+F` deschide și focalizează căutarea, `Delete` șterge QSO-ul selectat după confirmare, iar `Escape` anulează editarea. Repetoarele pot completa frecvența, modul și banda, dar aceste valori rămân editabile.
 
+Câmpul **Propagare** primește o sugestie implicită pe baza benzii, modului și repetorului selectat (de exemplu F2 pentru 20m, NVIS pentru 80m, Repeater la alegerea unui repetor). O alegere manuală rămâne protejată la schimbări ulterioare de bandă/mod, cu excepția contextelor semnificative (repetor sau satelit), care o pot suprascrie.
+
 ### Meniul Fișier
 
 Acțiunile care produc fișiere sunt grupate în **Fișier**: **Exportă Excel**, **Exportă ADIF** și **Creează backup**. Exporturile păstrează aceleași formate și alegerea destinației, iar backupul SQLite este creat în `backups/`. Comanda **Ieșire** închide în siguranță aplicația și ferestrele secundare deschise.
