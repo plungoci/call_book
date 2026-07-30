@@ -331,6 +331,59 @@ class QSOFormTests(unittest.TestCase):
 
             window.close()
 
+    def test_weather_panel_has_no_manual_refresh_button(self):
+        # Regression test: the manual "Actualizează" button was removed in
+        # favour of automatic, interval-based refreshing.
+        self.assertFalse(hasattr(self.form.weather_panel, "button"))
+
+    def test_weather_auto_refresh_timer_starts_with_configured_interval(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = load_config()
+            config["local_weather_auto_refresh_minutes"] = "30"
+            window = MainWindow(Database(Path(directory) / "logbook.db"), config)
+
+            self.assertTrue(window.weather_auto_refresh_timer.isActive())
+            self.assertEqual(window.weather_auto_refresh_timer.interval(), 30 * 60 * 1000)
+
+            window.close()
+
+    def test_weather_auto_refresh_disabled_for_interval_zero(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = load_config()
+            config["local_weather_auto_refresh_minutes"] = "0"
+            window = MainWindow(Database(Path(directory) / "logbook.db"), config)
+
+            self.assertFalse(window.weather_auto_refresh_timer.isActive())
+
+            window.close()
+
+    def test_automatic_weather_refresh_reschedules_itself(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = load_config()
+            config["local_weather_auto_refresh_minutes"] = "10"
+            window = MainWindow(Database(Path(directory) / "logbook.db"), config)
+            window.weather_auto_refresh_timer.stop()
+
+            window._automatic_weather_refresh()
+
+            self.assertTrue(window.weather_auto_refresh_timer.isActive())
+            self.assertEqual(window.weather_auto_refresh_timer.interval(), 10 * 60 * 1000)
+
+            window.close()
+
+    def test_saving_weather_settings_reschedules_the_timer(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = load_config()
+            config["local_weather_auto_refresh_minutes"] = "10"
+            window = MainWindow(Database(Path(directory) / "logbook.db"), config)
+
+            window.app_config["local_weather_auto_refresh_minutes"] = "60"
+            window._schedule_weather_auto_refresh()
+
+            self.assertEqual(window.weather_auto_refresh_timer.interval(), 60 * 60 * 1000)
+
+            window.close()
+
 
 if __name__ == "__main__":
     unittest.main()

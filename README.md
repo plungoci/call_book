@@ -91,7 +91,7 @@ Afișează locatorul Maidenhead (sau cel implicit, dacă nu s-a completat unul p
 
 ### Setări
 
-Oferă aceleași cinci acțiuni ca meniul **Setări**, ca listă de butoane: Date operator, Administrează repetoare, Setări propagare, Creează backup, Resetează numerotarea ID-urilor.
+Oferă aceleași acțiuni ca meniul **Setări**, ca listă de butoane: Date operator, Administrează repetoare, Setări propagare, Setări vreme locală, Creează backup, Resetează numerotarea ID-urilor.
 
 ## Formularul QSO
 
@@ -129,7 +129,7 @@ Câmpul intern **locator propriu** (`my_grid_square`) este completat automat, la
 
 ### Vreme locală
 
-Lângă formular, panoul **Vreme locală** afișează temperatura, umiditatea și condițiile curente la poziția stației (latitudine/longitudine din profilul operatorului), preluate de la [Open-Meteo](https://open-meteo.com/) — public, fără cheie API. Se actualizează automat, o singură dată, la scurt timp după deschiderea aplicației, și oricând la apăsarea butonului **Actualizează**; dacă poziția stației nu e setată (Setări → Date operator), panoul arată acest lucru în loc să încerce o cerere fără sens. La fel ca panoul de propagare, orice eșec de rețea lasă ultimele valori afișate neschimbate, cu un mesaj de stare clar.
+Lângă formular, panoul **Vreme locală** afișează temperatura, umiditatea și condițiile curente la poziția stației (latitudine/longitudine din profilul operatorului), preluate de la [Open-Meteo](https://open-meteo.com/) — public, fără cheie API. Nu are un buton de actualizare manuală: se actualizează automat, o singură dată la scurt timp după deschiderea aplicației, apoi periodic la fiecare `local_weather_auto_refresh_minutes` (vezi [Setări vreme locală](#setări-vreme-locală)) minute. Dacă poziția stației nu e setată (Setări → Date operator), panoul arată acest lucru în loc să încerce o cerere fără sens. La fel ca panoul de propagare, orice eșec de rețea lasă ultimele valori afișate neschimbate, cu un mesaj de stare clar.
 
 ## Meniul Fișier
 
@@ -149,7 +149,7 @@ Folosește API-ul nativ `sqlite3.backup()` pentru o copie online, consistentă, 
 
 ## Meniul Setări
 
-**Setări → Date operator**, **Setări → Repetoare** și **Setări → Setări propagare** deschid ferestrele de mai jos ca dialoguri modale (cât timp sunt deschise, blochează interacțiunea cu fereastra principală — nu se pot deschide două ferestre de același tip simultan). **Setări → Resetează numerotarea ID-urilor** cere confirmare și resetează contoarele SQLite (`AUTOINCREMENT`) pentru QSO-uri, repetoare și stații, fără să șteargă vreo înregistrare; următorul ID va fi 1 dacă tabelul e gol sau va urma cel mai mare ID existent.
+**Setări → Date operator**, **Setări → Repetoare**, **Setări → Setări propagare** și **Setări → Setări vreme locală** deschid ferestrele de mai jos ca dialoguri modale (cât timp sunt deschise, blochează interacțiunea cu fereastra principală — nu se pot deschide două ferestre de același tip simultan). **Setări → Resetează numerotarea ID-urilor** cere confirmare și resetează contoarele SQLite (`AUTOINCREMENT`) pentru QSO-uri, repetoare și stații, fără să șteargă vreo înregistrare; următorul ID va fi 1 dacă tabelul e gol sau va urma cel mai mare ID existent.
 
 ### Profil operator și localizare Maidenhead
 
@@ -168,6 +168,10 @@ Pe laptopuri fără GPS, Windows poate estima poziția din Wi-Fi, rețea sau alt
 ### Setări propagare
 
 **Setări → Setări propagare** conține o bifă **Actualizare automată** și un interval configurabil (10, 15, 30 sau 60 de minute), salvate în `config.json` ca `propagation_auto_refresh_minutes`. **Salvează** persistă valoarea și reprogramează imediat actualizarea automată a panoului de propagare (vezi mai jos). Dezactivarea bifei salvează intervalul ca `"0"`, ceea ce oprește actualizarea automată complet.
+
+### Setări vreme locală
+
+**Setări → Setări vreme locală** funcționează identic cu Setări propagare: o bifă **Actualizare automată** și un interval configurabil (10, 15, 30 sau 60 de minute), salvate în `config.json` ca `local_weather_auto_refresh_minutes` (implicit 30). **Salvează** reprogramează imediat actualizarea automată a panoului **Vreme locală**; dezactivarea bifei salvează `"0"`, oprind actualizarea automată complet. Panoul de vreme locală nu are un buton de actualizare manuală — aceasta este singura cale de a-i schimba cadența.
 
 ## Panou condiții de propagare
 
@@ -193,12 +197,13 @@ Datele agregate sunt păstrate local în `cache/space_weather/latest.json` timp 
 
 ## Configurare (`config.json`)
 
-Fișierul e creat automat la prima pornire, cu chei implicite. Doar două chei au efect asupra aplicației în acest moment:
+Fișierul e creat automat la prima pornire, cu chei implicite. Doar trei chei au efect asupra aplicației în acest moment:
 
 | Cheie | Valori | Efect |
 |---|---|---|
 | `show_propagation_panel` | `"true"` / `"false"` | dacă tab-ul **Propagare** și panoul asociat sunt create la pornire |
 | `propagation_auto_refresh_minutes` | `"10"`, `"15"`, `"30"`, `"60"` (orice altă valoare dezactivează) | intervalul actualizării automate a panoului de propagare |
+| `local_weather_auto_refresh_minutes` | `"10"`, `"15"`, `"30"`, `"60"` (orice altă valoare dezactivează) | intervalul actualizării automate a panoului de vreme locală |
 
 Fișierul mai reține și câteva chei suplimentare (`user_callsign`, `operator_name`, `grid_square`, `location`, `equipment`, `antenna`, `default_power_w`, `export_directory`, `backup_directory`) care nu sunt citite momentan de aplicație — datele reale ale operatorului sunt stocate în tabelul SQLite `operator_profile`, iar exporturile/backup-ul folosesc directoarele implicite `exports/`/`backups/`.
 
