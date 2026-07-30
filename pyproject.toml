@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "call-book"
+version = "0.1.0"
+description = "Local/offline amateur-radio QSO logbook (PySide6 + SQLite)."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "PySide6>=6.7,<7",
+    "openpyxl>=3.1,<4",
+]
+
+[tool.setuptools.packages.find]
+include = ["call_book*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+# Qt widget imports are re-exported with `import *` in a few UI modules so the
+# generated forms stay short; ignore the star-import warnings there instead of
+# spelling out dozens of QtWidgets names.
+ignore = ["F403", "F405"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+# openpyxl ships no inline types and no third-party stub package is pinned
+# in requirements.txt; treat it as untyped rather than adding a new dependency.
+module = "openpyxl.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Tests deliberately monkeypatch bound methods (e.g. `service._get = Mock(...)`)
+# to stub network calls; that pattern is what method-assign exists to flag
+# in production code, so it is disabled for the tests package only.
+module = "tests.*"
+disable_error_code = ["method-assign"]

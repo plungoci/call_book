@@ -1,9 +1,10 @@
 """Unit tests for reusable live-entry text formatters."""
+
 from __future__ import annotations
 
 import unittest
 
-from utils.text_formatters import format_callsign, format_grid_square, format_operator_name
+from call_book.utils.text_formatters import format_callsign, format_grid_square, format_operator_name
 
 
 class TextFormatterTests(unittest.TestCase):

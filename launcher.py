@@ -1,12 +1,12 @@
 """Pornește aplicația și instalează în siguranță actualizările Git disponibile."""
+
 from __future__ import annotations
 
-from pathlib import Path
 import shutil
 import subprocess
 import sys
-from typing import Sequence
-
+from collections.abc import Sequence
+from pathlib import Path
 
 GIT_NETWORK_TIMEOUT = 20
 GIT_COMMAND_TIMEOUT = 10
@@ -61,9 +61,7 @@ def get_remote_commit(project_dir: Path, branch: str) -> str | None:
 
 def requirements_changed(project_dir: Path, old_commit: str, new_commit: str) -> bool:
     """Returnează dacă requirements.txt diferă între cele două commituri."""
-    result = run_git_command(
-        ["diff", "--quiet", old_commit, new_commit, "--", "requirements.txt"], project_dir
-    )
+    result = run_git_command(["diff", "--quiet", old_commit, new_commit, "--", "requirements.txt"], project_dir)
     return result is not None and result.returncode == 1
 
 
@@ -91,9 +89,7 @@ def install_requirements(project_dir: Path) -> bool:
 
 def _remote_is_newer(project_dir: Path, local_commit: str, remote_commit: str) -> bool:
     """Verifică dacă HEAD poate avansa fast-forward la commitul remote."""
-    result = run_git_command(
-        ["merge-base", "--is-ancestor", local_commit, remote_commit], project_dir
-    )
+    result = run_git_command(["merge-base", "--is-ancestor", local_commit, remote_commit], project_dir)
     return result is not None and result.returncode == 0
 
 
@@ -132,9 +128,7 @@ def check_for_updates(project_dir: Path) -> bool:
         return False
 
     print("A fost găsită o versiune nouă.")
-    pull_result = run_git_command(
-        ["pull", "--ff-only", "origin", branch], project_dir, GIT_NETWORK_TIMEOUT
-    )
+    pull_result = run_git_command(["pull", "--ff-only", "origin", branch], project_dir, GIT_NETWORK_TIMEOUT)
     if pull_result is None or pull_result.returncode != 0:
         print("Există modificări locale sau istoricul Git este divergent. Actualizarea a fost anulată.")
         return False

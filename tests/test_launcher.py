@@ -1,8 +1,9 @@
 """Teste unitare pentru actualizatorul lansatorului."""
+
 from __future__ import annotations
 
-from pathlib import Path
 import subprocess
+from pathlib import Path
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
@@ -53,10 +54,21 @@ class LauncherTests(TestCase):
     @patch("launcher.is_git_repository", return_value=True)
     @patch("launcher.shutil.which", return_value="/usr/bin/git")
     @patch("launcher.run_git_command", side_effect=[completed(), completed()])
-    def test_update_pulls_and_installs_changed_requirements(self, run_git: MagicMock, *_: MagicMock) -> None:
+    def test_update_pulls_and_installs_changed_requirements(
+        self,
+        run_git: MagicMock,
+        _which: MagicMock,
+        _is_git_repository: MagicMock,
+        _remote_is_newer: MagicMock,
+        _current_branch: MagicMock,
+        _remote_commit: MagicMock,
+        _current_commit: MagicMock,
+        _requirements_changed: MagicMock,
+        install_requirements: MagicMock,
+    ) -> None:
         self.assertTrue(launcher.check_for_updates(self.project_dir))
         self.assertEqual(run_git.call_args_list[1].args[0], ["pull", "--ff-only", "origin", "work"])
-        launcher.install_requirements.assert_called_once_with(self.project_dir)
+        install_requirements.assert_called_once_with(self.project_dir)
 
     @patch("launcher.get_current_commit", return_value="old")
     @patch("launcher.get_remote_commit", return_value="new")
@@ -99,8 +111,6 @@ class LauncherTests(TestCase):
 
     @patch("launcher.start_application")
     @patch("launcher.check_for_updates", return_value=False)
-    def test_main_starts_application_when_update_fails(
-        self, _: MagicMock, start: MagicMock
-    ) -> None:
+    def test_main_starts_application_when_update_fails(self, _: MagicMock, start: MagicMock) -> None:
         launcher.main()
         start.assert_called_once_with(Path(launcher.__file__).resolve().parent)

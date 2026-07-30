@@ -7,3 +7,6 @@ exports/*.adi
 backups/*.db
 radio_logbook.log
 config.json
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
