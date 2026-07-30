@@ -332,10 +332,10 @@ class QSOFormTests(unittest.TestCase):
 
             window.close()
 
-    def test_weather_panel_has_no_manual_refresh_button(self):
-        # Regression test: the manual "Actualizează" button was removed in
-        # favour of automatic, interval-based refreshing.
-        self.assertFalse(hasattr(self.form.weather_panel, "button"))
+    def test_weather_panel_manual_refresh_button_triggers_refresh(self):
+        self.form.weather_panel.button.click()
+
+        self.assertIn("nu este setată", self.form.weather_panel.status.text())
 
     def test_weather_auto_refresh_timer_starts_with_configured_interval(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -355,6 +355,17 @@ class QSOFormTests(unittest.TestCase):
             window = MainWindow(Database(Path(directory) / "logbook.db"), config)
 
             self.assertFalse(window.weather_auto_refresh_timer.isActive())
+            self.assertFalse(window.form.weather_panel.button.isHidden())
+
+            window.close()
+
+    def test_weather_manual_refresh_button_hidden_when_auto_refresh_is_enabled(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = load_config()
+            config["local_weather_auto_refresh_minutes"] = "30"
+            window = MainWindow(Database(Path(directory) / "logbook.db"), config)
+
+            self.assertTrue(window.form.weather_panel.button.isHidden())
 
             window.close()
 

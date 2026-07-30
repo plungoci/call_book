@@ -329,7 +329,9 @@ class MainWindow(QMainWindow):
             minutes = int(self.app_config.get("local_weather_auto_refresh_minutes", "30"))
         except ValueError:
             minutes = 30
-        if minutes not in (10, 15, 30, 60):
+        automatic_refresh_enabled = minutes in (10, 15, 30, 60)
+        self.form.weather_panel.set_manual_refresh_available(not automatic_refresh_enabled)
+        if not automatic_refresh_enabled:
             return
         self.weather_auto_refresh_timer.start(minutes * 60 * 1000)
 
