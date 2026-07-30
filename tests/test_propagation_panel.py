@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from call_book.propagation_models import SpaceWeatherData
 from call_book.services.band_detector import BandDetector
@@ -21,7 +21,7 @@ from call_book.services.space_weather_service import (
     parse_gfz_nowcast,
     parse_silso_daily_csv,
 )
-from call_book.ui.propagation_panel import PropagationPanel
+from call_book.ui.propagation_panel import PropagationPanel, Worker
 from call_book.validators import frequency_range_for_band
 
 
@@ -50,6 +50,17 @@ class SpaceWeatherTests(TestCase):
             with self.assertRaises(SpaceWeatherError):
                 service.fetch(force=True)
 
+    def test_fetch_does_not_probe_a_raw_socket_before_the_real_request(self) -> None:
+        # Regression test: a prior raw socket.create_connection() pre-check
+        # bypassed any HTTP(S) proxy that urlopen() itself would respect,
+        # falsely reporting "no internet connection" on proxied networks even
+        # though the real request would have succeeded.
+        with TemporaryDirectory() as directory, patch("socket.create_connection", side_effect=OSError("blocked")):
+            service = SpaceWeatherService(PropagationCache(Path(directory)))
+            service._get = Mock(return_value=[{"kp_index": "3", "a_running": "12"}])
+            weather = service.fetch(force=True)
+            self.assertEqual(weather.kp_index, 3)
+
 
 class PropagationEstimatorTests(TestCase):
     def setUp(self) -> None:
@@ -67,6 +78,17 @@ class PropagationEstimatorTests(TestCase):
 
     def test_unavailable_values_are_displayed_clearly(self) -> None:
         self.assertEqual(PropagationPanel._format_value(None), "N/A")
+
+    def test_worker_logs_the_fetch_failure_before_signaling(self) -> None:
+        # Regression test: a bare "except Exception: self.failed.emit()" gave
+        # no way to diagnose why "Ultima actualizare nu a reușit." happened.
+        worker = Worker(force=True)
+        with (
+            patch.object(SpaceWeatherService, "fetch", side_effect=SpaceWeatherError("boom")),
+            self.assertLogs("call_book.ui.propagation_panel", level="WARNING") as logs,
+        ):
+            worker.run()
+        self.assertIn("boom", logs.output[0])
 
     def test_institutional_text_parsers_use_latest_valid_values(self) -> None:
         self.assertEqual(parse_silso_daily_csv("# header\n2025; 1; 1; 2025.0; 99; 2; 1\n"), 99)
