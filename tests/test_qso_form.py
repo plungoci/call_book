@@ -147,6 +147,11 @@ class QSOFormTests(unittest.TestCase):
         for key in ("callsign", "mode", "propagation_mode"):
             self.assertLessEqual(self.form.fields[key].maximumWidth(), _FIELD_MAX_WIDTH)
 
+    def test_weather_panel_has_a_bounded_maximum_width(self):
+        # Regression test: the panel used to stretch into all leftover grid
+        # width instead of sizing to its own (much narrower) content.
+        self.assertLessEqual(self.form.weather_panel.maximumWidth(), 320)
+
     def test_weather_panel_does_not_fetch_on_construction(self):
         # Regression test: an eager fetch in __init__ made every MainWindow
         # construction (including plain unit tests) spawn a real background

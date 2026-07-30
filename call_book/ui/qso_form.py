@@ -127,8 +127,12 @@ class QSOForm(QGroupBox):
                 form.addRow(label_text, widget)
                 self.fields[key] = widget
         self.weather_panel = LocalWeatherPanel(self.location_provider)
+        self.weather_panel.setMaximumWidth(320)
         grid.addWidget(self.weather_panel, 0, len(FIELD_GROUPS))
-        grid.setColumnStretch(len(FIELD_GROUPS), 1)
+        # A trailing empty column absorbs leftover width instead of it being
+        # redistributed into "Legătură" once the weather panel's own cap
+        # stops it from claiming that space itself.
+        grid.setColumnStretch(len(FIELD_GROUPS) + 1, 1)
 
         self.notes = QTextEdit()
         self.notes.setFixedHeight(72)
