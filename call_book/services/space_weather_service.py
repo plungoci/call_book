@@ -11,14 +11,24 @@ import csv
 import io
 import json
 import logging
+import ssl
 import time
 from datetime import UTC, datetime
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+import certifi
+
 from ..propagation_models import SpaceWeatherData, WeatherValue
 from .propagation_cache import PropagationCache
+
+# Some Python-on-Windows installs ship an incomplete default certificate
+# store, causing "CERTIFICATE_VERIFY_FAILED: unable to get local issuer
+# certificate" for otherwise valid providers even though the same host
+# works fine in a browser.  Pinning certifi's actively maintained CA bundle
+# avoids depending on the OS/interpreter's own (possibly stale) trust store.
+_SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
 
 NOAA_ENDPOINTS = {
     "kp": "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json",
@@ -165,12 +175,22 @@ class SpaceWeatherService:
                             url, headers={"Accept": "application/json, text/plain", "User-Agent": "RadioLogbook/1.0"}
                         ),
                         timeout=20,
+                        context=_SSL_CONTEXT,
                     ) as response:
                         raw = response.read(_MAX_RESPONSE_BYTES + 1)
                 if len(raw) > _MAX_RESPONSE_BYTES:
                     raise SpaceWeatherError("Răspuns prea mare")
                 text = raw.decode("utf-8-sig")
-                return json.loads(text) if as_json else text
+                if not as_json:
+                    return text
+                try:
+                    return json.loads(text)
+                except json.JSONDecodeError as exc:
+                    # A non-JSON/empty 200 response usually means a proxy, WAF, or
+                    # captive portal answered instead of the real provider; the
+                    # snippet lets that be told apart from a genuinely broken feed.
+                    snippet = text[:200].replace("\n", " ") or "<gol>"
+                    raise SpaceWeatherError(f"{exc} — conținut primit: {snippet!r}") from exc
             except HTTPError as exc:
                 # 404 is not retried; 429 is retried once with backoff, never fatal to other providers.
                 last = exc
@@ -180,7 +200,6 @@ class SpaceWeatherService:
                 URLError,
                 OSError,
                 UnicodeDecodeError,
-                json.JSONDecodeError,
                 SpaceWeatherError,
                 AttributeError,
             ) as exc:

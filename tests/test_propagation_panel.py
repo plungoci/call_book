@@ -50,6 +50,30 @@ class SpaceWeatherTests(TestCase):
             with self.assertRaises(SpaceWeatherError):
                 service.fetch(force=True)
 
+    def test_get_reports_a_snippet_when_a_200_response_is_not_valid_json(self) -> None:
+        # Regression test: a WAF/proxy/captive-portal answering with an empty
+        # or non-JSON 200 response previously surfaced only as an opaque
+        # "Expecting value: line 1 column 1 (char 0)", indistinguishable from
+        # a genuinely broken feed. The response body must now be visible too.
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc_info):
+                return False
+
+            def read(self, _n):
+                return b"<html>blocked</html>"
+
+        with (
+            TemporaryDirectory() as directory,
+            patch("call_book.services.space_weather_service.urlopen", return_value=FakeResponse()),
+        ):
+            service = SpaceWeatherService(PropagationCache(Path(directory)))
+            with self.assertRaises(SpaceWeatherError) as ctx:
+                service._get("https://example.invalid/data.json")
+            self.assertIn("blocked", str(ctx.exception))
+
     def test_fetch_does_not_probe_a_raw_socket_before_the_real_request(self) -> None:
         # Regression test: a prior raw socket.create_connection() pre-check
         # bypassed any HTTP(S) proxy that urlopen() itself would respect,
