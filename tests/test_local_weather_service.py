@@ -19,10 +19,11 @@ class FakeResponse:
 class LocalWeatherServiceTests(TestCase):
     def test_fetch_reads_temperature_humidity_and_condition(self) -> None:
         payload = (
-            b'{"current": {"temperature_2m": 21.3, "relative_humidity_2m": 55, "weather_code": 3}, '
+            b'{"current": {"temperature_2m": 21.3, "relative_humidity_2m": 55, "weather_code": 3, '
+            b'"pressure_msl": 1017.6}, '
             b'"current_units": {"temperature_2m": "\xc2\xb0C"}}'
         )
-        metar_payload = b'[{"icaoId": "LRSB", "wspd": 12}]'
+        metar_payload = b'[{"icaoId": "LRSB", "wspd": 12, "wdir": 270}]'
         with patch(
             "call_book.services.local_weather_service.curl_requests.get",
             side_effect=(FakeResponse(payload), FakeResponse(metar_payload)),
@@ -31,10 +32,13 @@ class LocalWeatherServiceTests(TestCase):
         self.assertEqual(result.temperature_c, 21.3)
         self.assertEqual(result.humidity_percent, 55)
         self.assertEqual(result.condition, "Înnorat")
+        self.assertEqual(result.atmospheric_pressure_hpa, 1017.6)
         self.assertEqual(result.wind_speed_knots, 12)
+        self.assertEqual(result.wind_direction_degrees, 270)
         self.assertAlmostEqual(result.wind_speed_kmh or 0, 22.224)
         self.assertEqual(mock_get.call_args_list[0].kwargs.get("impersonate"), "chrome")
         self.assertEqual(mock_get.call_args_list[0].kwargs["params"]["latitude"], "46.7700")
+        self.assertIn("pressure_msl", mock_get.call_args_list[0].kwargs["params"]["current"])
         self.assertEqual(mock_get.call_args_list[1].kwargs["params"]["ids"], "LRSB")
 
     def test_fetch_raises_when_response_has_no_current_block(self) -> None:
@@ -72,3 +76,4 @@ class LocalWeatherServiceTests(TestCase):
             result = LocalWeatherService().fetch(46.77, 23.6)
         self.assertIsNone(result.wind_speed_knots)
         self.assertIsNone(result.wind_speed_kmh)
+        self.assertIsNone(result.wind_direction_degrees)
