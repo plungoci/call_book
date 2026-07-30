@@ -17,7 +17,7 @@ Aplicație desktop locală/offline pentru evidența legăturilor radioamatorice 
 - **Export ADIF** cu lungimi de câmp calculate exact în octeți (suport diacritice).
 - **Backup SQLite online** (API `sqlite3.backup()`), fără să blocheze aplicația.
 - **Panou „Condiții de propagare”**: indici meteo spațiali (Kp, SFI, SSN, raze X, vânt solar etc.) de la NOAA/SILSO/GFZ/NRCan/HamQSL și o estimare orientativă zi/noapte pentru benzile HF, cu actualizare automată configurabilă.
-- **Vreme locală**: temperatură, umiditate, presiune atmosferică și condiții curente la poziția stației (Open-Meteo, fără cheie API), afișate direct lângă formularul QSO.
+- **Vreme locală**: temperatură, umiditate și condiții curente la poziția stației (Open-Meteo, fără cheie API), plus presiunea atmosferică și vântul de la Aeroportul Internațional Sibiu, afișate direct lângă formularul QSO.
 - **Resetare numerotare ID-uri** pentru QSO-uri, repetoare și stații, fără pierderea datelor.
 
 ## Cerințe și instalare
@@ -129,7 +129,7 @@ Câmpul intern **locator propriu** (`my_grid_square`) este completat automat, la
 
 ### Vreme locală
 
-Lângă formular, panoul **Vreme locală** afișează temperatura, umiditatea, presiunea atmosferică la nivelul mării și condițiile curente la poziția stației (latitudine/longitudine din profilul operatorului), preluate de la [Open-Meteo](https://open-meteo.com/) — public, fără cheie API. Viteza și direcția vântului sunt observația METAR a Aeroportului Internațional Sibiu (LRSB), preluată de la Aviation Weather Center; viteza este afișată atât în noduri, cât și în km/h, iar direcția în grade și punct cardinal. Dacă observația METAR nu este disponibilă, vântul apare ca `N/A`, fără a ascunde celelalte date meteo. Panoul nu are un buton de actualizare manuală: se actualizează automat, o singură dată la scurt timp după deschiderea aplicației, apoi periodic la fiecare `local_weather_auto_refresh_minutes` (vezi [Setări vreme locală](#setări-vreme-locală)) minute. Dacă poziția stației nu e setată (Setări → Date operator), panoul arată acest lucru în loc să încerce o cerere fără sens. La fel ca panoul de propagare, orice eșec de rețea lasă ultimele valori afișate neschimbate, cu un mesaj de stare clar.
+Lângă formular, panoul **Vreme locală** afișează temperatura, umiditatea și condițiile curente la poziția stației (latitudine/longitudine din profilul operatorului), preluate de la [Open-Meteo](https://open-meteo.com/) — public, fără cheie API. Presiunea atmosferică, viteza și direcția vântului provin din observația METAR a Aeroportului Internațional Sibiu (LRSB), preluată de la Aviation Weather Center; presiunea este afișată în hPa, viteza atât în noduri, cât și în km/h, iar direcția în grade și punct cardinal. Dacă observația METAR nu este disponibilă, presiunea și vântul apar ca `N/A`, fără a ascunde celelalte date meteo. Panoul nu are un buton de actualizare manuală: se actualizează automat, o singură dată la scurt timp după deschiderea aplicației, apoi periodic la fiecare `local_weather_auto_refresh_minutes` (vezi [Setări vreme locală](#setări-vreme-locală)) minute. Dacă poziția stației nu e setată (Setări → Date operator), panoul arată acest lucru în loc să încerce o cerere fără sens. La fel ca panoul de propagare, orice eșec de rețea lasă ultimele valori afișate neschimbate, cu un mesaj de stare clar.
 
 ## Meniul Fișier
 
