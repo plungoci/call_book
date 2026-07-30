@@ -40,11 +40,15 @@ class LocalWeatherPanel(QGroupBox):
         self.temperature_label = QLabel("N/A")
         self.humidity_label = QLabel("N/A")
         self.condition_label = QLabel("N/A")
+        self.pressure_label = QLabel("N/A")
         self.wind_label = QLabel("N/A")
+        self.wind_direction_label = QLabel("N/A")
         form.addRow("Temperatură", self.temperature_label)
         form.addRow("Umiditate", self.humidity_label)
         form.addRow("Condiții", self.condition_label)
+        form.addRow("Presiune atmosferică", self.pressure_label)
         form.addRow("Vânt aeroport Sibiu", self.wind_label)
+        form.addRow("Direcție vânt", self.wind_direction_label)
         layout.addLayout(form)
         self.button = QPushButton("Actualizează")
         self.button.clicked.connect(self.refresh)
@@ -78,11 +82,24 @@ class LocalWeatherPanel(QGroupBox):
         self.temperature_label.setText(f"{w.temperature_c:.1f} °C" if w.temperature_c is not None else "N/A")
         self.humidity_label.setText(f"{w.humidity_percent:.0f}%" if w.humidity_percent is not None else "N/A")
         self.condition_label.setText(w.condition or "N/A")
+        self.pressure_label.setText(
+            f"{w.atmospheric_pressure_hpa:.1f} hPa" if w.atmospheric_pressure_hpa is not None else "N/A"
+        )
         self.wind_label.setText(
             f"{w.wind_speed_knots:.0f} kt / {w.wind_speed_kmh:.1f} km/h" if w.wind_speed_knots is not None else "N/A"
         )
+        self.wind_direction_label.setText(_format_wind_direction(w.wind_direction_degrees))
 
     def shutdown(self):
         if self._worker_thread is not None and self._worker_thread.isRunning():
             self._worker_thread.quit()
             self._worker_thread.wait(1000)
+
+
+def _format_wind_direction(degrees):
+    if degrees is None:
+        return "N/A"
+    normalized = degrees % 360
+    cardinal_points = ("N", "NE", "E", "SE", "S", "SV", "V", "NV")
+    cardinal = cardinal_points[int((normalized + 22.5) // 45) % len(cardinal_points)]
+    return f"{normalized:.0f}° ({cardinal})"

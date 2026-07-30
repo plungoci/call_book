@@ -61,7 +61,9 @@ class LocalWeatherData:
     temperature_c: float | None
     humidity_percent: float | None
     condition: str | None
+    atmospheric_pressure_hpa: float | None = None
     wind_speed_knots: float | None = None
+    wind_direction_degrees: float | None = None
 
     @property
     def wind_speed_kmh(self) -> float | None:
@@ -82,7 +84,7 @@ class LocalWeatherService:
         params = {
             "latitude": f"{latitude:.4f}",
             "longitude": f"{longitude:.4f}",
-            "current": "temperature_2m,relative_humidity_2m,weather_code",
+            "current": "temperature_2m,relative_humidity_2m,weather_code,pressure_msl",
             "timezone": "auto",
         }
         try:
@@ -95,16 +97,19 @@ class LocalWeatherService:
         if not isinstance(current, dict):
             raise LocalWeatherError("Răspunsul nu conține date meteo curente.")
         code = _number(current.get("weather_code"))
+        wind_speed, wind_direction = self._fetch_sibiu_airport_wind(timeout_seconds)
         return LocalWeatherData(
             temperature_c=_number(current.get("temperature_2m")),
             humidity_percent=_number(current.get("relative_humidity_2m")),
             condition=_CONDITIONS.get(int(code)) if code is not None else None,
-            wind_speed_knots=self._fetch_sibiu_airport_wind(timeout_seconds),
+            atmospheric_pressure_hpa=_number(current.get("pressure_msl")),
+            wind_speed_knots=wind_speed,
+            wind_direction_degrees=wind_direction,
         )
 
     @staticmethod
-    def _fetch_sibiu_airport_wind(timeout_seconds: float) -> float | None:
-        """Return the latest wind speed reported by Sibiu Airport's METAR."""
+    def _fetch_sibiu_airport_wind(timeout_seconds: float) -> tuple[float | None, float | None]:
+        """Return the latest wind speed and direction reported by Sibiu Airport's METAR."""
         try:
             response = curl_requests.get(
                 _SIBIU_METAR_ENDPOINT,
@@ -116,8 +121,8 @@ class LocalWeatherService:
             reports = json.loads(response.content.decode("utf-8"))
         except (curl_requests.errors.RequestsError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             LOG.warning("Vântul METAR pentru aeroportul Sibiu nu este disponibil: %s", exc)
-            return None
+            return None, None
 
         if not isinstance(reports, list) or not reports or not isinstance(reports[0], dict):
-            return None
-        return _number(reports[0].get("wspd"))
+            return None, None
+        return _number(reports[0].get("wspd")), _number(reports[0].get("wdir"))

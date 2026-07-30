@@ -168,12 +168,21 @@ class QSOFormTests(unittest.TestCase):
 
     def test_weather_panel_displays_fetched_values(self):
         self.form.weather_panel.update_values(
-            LocalWeatherData(temperature_c=21.3, humidity_percent=55, condition="Înnorat", wind_speed_knots=12)
+            LocalWeatherData(
+                temperature_c=21.3,
+                humidity_percent=55,
+                condition="Înnorat",
+                atmospheric_pressure_hpa=1017.6,
+                wind_speed_knots=12,
+                wind_direction_degrees=270,
+            )
         )
         self.assertEqual(self.form.weather_panel.temperature_label.text(), "21.3 °C")
         self.assertEqual(self.form.weather_panel.humidity_label.text(), "55%")
         self.assertEqual(self.form.weather_panel.condition_label.text(), "Înnorat")
+        self.assertEqual(self.form.weather_panel.pressure_label.text(), "1017.6 hPa")
         self.assertEqual(self.form.weather_panel.wind_label.text(), "12 kt / 22.2 km/h")
+        self.assertEqual(self.form.weather_panel.wind_direction_label.text(), "270° (V)")
 
     def test_shutdown_does_not_raise_without_an_active_worker(self):
         self.form.shutdown()
