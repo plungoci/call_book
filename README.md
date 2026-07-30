@@ -5,6 +5,10 @@
 
 Aplicație desktop locală/offline pentru evidența legăturilor radioamatorice (QSO), scrisă în Python cu PySide6 (Qt for Python). Datele sunt păstrate în SQLite; Excel este folosit numai pentru export, nu ca sursă de date.
 
+## Prezentare vizuală
+
+Imaginea de mai sus prezintă într-un singur cadru principalele zone ale aplicației: formularul de introducere a unui QSO, filtrele de căutare, acțiunile rapide și tabelul jurnalului. Galeria folosește numai captura `preview.png` deja existentă în repository, astfel încât modificarea documentației nu adaugă fișiere binare noi în pull request.
+
 ## Funcționalități
 
 - **Jurnal QSO**: adăugare, editare, ștergere și listare a legăturilor, cu filtrare după indicativ, bandă, mod, ID repetor și interval de date.
