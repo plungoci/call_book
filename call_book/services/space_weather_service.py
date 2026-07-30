@@ -50,7 +50,11 @@ NOAA_FALLBACK_ENDPOINTS = {
 SILSO_ENDPOINT = "https://www.sidc.be/SILSO/INFO/sndtotcsv.php"
 GFZ_ENDPOINT = "https://kp.gfz-potsdam.de/app/files/Kp_ap_nowcast.txt"
 LOG = logging.getLogger(__name__)
-_MAX_RESPONSE_BYTES = 1_000_000
+# SILSO's daily sunspot-number feed is the full series back to 1818 (not a
+# recent window like the other providers), several megabytes on its own; the
+# former 1MB cap rejected it outright as "Răspuns prea mare" even though it
+# was a genuine, complete response rather than a truncation/DoS risk.
+_MAX_RESPONSE_BYTES = 8_000_000
 
 
 class SpaceWeatherError(RuntimeError):

@@ -87,7 +87,7 @@ class SpaceWeatherTests(TestCase):
                 return False
 
             def read(self, _n):
-                return b"<html>blocked page too large" + b" filler" * 200_000
+                return b"<html>blocked page too large" + b" filler" * 1_200_000
 
         with (
             TemporaryDirectory() as directory,
