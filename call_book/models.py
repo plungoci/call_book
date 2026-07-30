@@ -16,29 +16,18 @@ class _Row(Protocol):
 @dataclass(slots=True)
 class QSO:
     callsign: str
-    qso_start_utc: str
     frequency_mhz: float
     mode: str
     id: int | None = None
-    qso_end_utc: str | None = None
     band: str = ""
     repeater_id: int | None = None
-    rst_sent: str = ""
-    rst_received: str = ""
     operator_name: str = ""
     grid_square: str = ""
-    power_w: float | None = None
     notes: str = ""
-    qsl_status: str = "NOT_SENT"
     created_at: str = ""
     updated_at: str | None = None
     my_grid_square: str = ""
     propagation_mode: str = "Necunoscută"
-    satellite_name: str = ""
-    uplink_mode: str = ""
-    downlink_mode: str = ""
-    distance_km: float | None = None
-    azimuth_deg: float | None = None
     propagation_notes: str = ""
 
     @classmethod

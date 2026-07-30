@@ -8,7 +8,7 @@ Aplicație desktop locală/offline pentru evidența legăturilor radioamatorice 
 
 - Adăugare, editare, ștergere, listare și filtrare QSO (indicativ, bandă, mod, repetor și interval UTC), cu confirmare înaintea ștergerii.
 - Profil operator persistent în SQLite: date personale, echipament, antenă, putere implicită, club și observații.
-- Validare indicativ, frecvență, putere, locator Maidenhead, date de propagare și interval temporal; avertizare pentru duplicate în ±2 minute.
+- Validare indicativ, frecvență, locator Maidenhead și tip de propagare; avertizare pentru duplicate cu același indicativ, frecvență și mod.
 - Calcul configurabil al benzii, repetoare administrabile și păstrarea QSO-urilor la ștergerea unui repetor (`repeater_id` devine `NULL`).
 - Export Excel `.xlsx` cu antet, filtru, rând înghețat și dimensiuni ajustate; export ADIF cu lungimi calculate în octeți.
 - Backup SQLite online în `backups/`, configurare JSON locală și jurnal în `radio_logbook.log`.
@@ -53,9 +53,7 @@ Pentru actualizare automată, Git trebuie să fie instalat, iar proiectul trebui
 
 ## Utilizare
 
-Toate orele formularului și ale bazei de date sunt UTC; antetul afișează simultan timpul local și UTC. **QSO nou** sau `Ctrl+N` resetează formularul. `Ctrl+S` salvează, `Ctrl+F` deschide și focalizează căutarea, `Delete` șterge QSO-ul selectat după confirmare, iar `Escape` anulează editarea. Repetoarele pot completa frecvența, modul și banda, dar aceste valori rămân editabile.
-
-În formularul QSO, bifează **Raport și confirmare** sau **Timp și traseu** pentru a afișa câmpurile din aceste secțiuni. Secțiunile sunt ascunse implicit, astfel încât interfața rămâne simplă când nu ai nevoie de ele.
+Antetul afișează simultan timpul local și UTC. **QSO nou** sau `Ctrl+N` resetează formularul. `Ctrl+S` salvează, `Ctrl+F` deschide și focalizează căutarea, `Delete` șterge QSO-ul selectat după confirmare, iar `Escape` anulează editarea. Repetoarele pot completa frecvența, modul și banda, dar aceste valori rămân editabile.
 
 ### Meniul Fișier
 
@@ -81,7 +79,7 @@ Pe laptopuri fără GPS, Windows poate estima poziția din Wi-Fi, rețea sau alt
 
 ### Editarea și ștergerea QSO-urilor
 
-Selectează un rând din tabel: devin disponibile **Editează** și **Șterge**. **Editează** încarcă toate datele și schimbă acțiunea principală în **Actualizează QSO**; ID-ul înregistrării rămâne același. **Anulează editarea** abandonează modificările fără a scrie în baza de date. **Șterge** afișează indicativul, frecvența și ora UTC a QSO-ului și solicită confirmare înainte de eliminarea definitivă.
+Selectează un rând din tabel: devin disponibile **Editează** și **Șterge**. **Editează** încarcă toate datele și schimbă acțiunea principală în **Actualizează QSO**; ID-ul înregistrării rămâne același. **Anulează editarea** abandonează modificările fără a scrie în baza de date. **Șterge** solicită confirmare înainte de eliminarea definitivă.
 
 ### Formatare automată
 
@@ -89,7 +87,7 @@ Pe măsură ce tastezi, câmpul **Indicativ** este convertit în majuscule (incl
 
 Din **Fișier**, **Exportă Excel** creează implicit un fișier în `exports/`, **Exportă ADIF** creează `.adi` în același director, iar **Creează backup** folosește API-ul `sqlite3.backup()` și salvează în `backups/`.
 
-Exportul ADIF include `PROP_MODE` când există echivalent ADIF, `SAT_NAME`, `SAT_MODE` (uplink/downlink), `DISTANCE` și observațiile de propagare în `COMMENT`, păstrând și observațiile QSO existente. Azimutul și modurile fără echivalent ADIF rămân disponibile în Excel. Exportul Excel adaugă coloanele **Propagare**, **Satelit**, **Uplink**, **Downlink**, **Distanță**, **Azimut** și **Observații propagare**.
+Exportul ADIF include `PROP_MODE` când există echivalent ADIF și observațiile de propagare în `COMMENT`, păstrând și observațiile QSO existente. Exportul Excel adaugă coloanele **Propagare** și **Observații propagare**.
 
 ## Structură
 

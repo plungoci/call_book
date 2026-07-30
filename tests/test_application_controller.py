@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -15,7 +14,7 @@ from call_book.models import QSO
 
 class ApplicationControllerTests(TestCase):
     def _qso(self) -> QSO:
-        return QSO(callsign="yo3abc", qso_start_utc=datetime.now(UTC).isoformat(), frequency_mhz=145.5, mode="FM")
+        return QSO(callsign="yo3abc", frequency_mhz=145.5, mode="FM")
 
     def test_save_normalizes_and_lists_qso_without_tk(self) -> None:
         with TemporaryDirectory() as directory:

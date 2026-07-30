@@ -123,7 +123,7 @@ class MainWindow(QMainWindow):
         b.clicked.connect(self.refresh)
         filters.addWidget(b)
         layout.addLayout(filters)
-        self.form = QSOForm(self.db.list_repeaters, self.operator_profile.default_power_w)
+        self.form = QSOForm(self.db.list_repeaters)
         self.form.contextChanged.connect(self.propagation_context_changed)
         layout.addWidget(self.form)
         actions = QHBoxLayout()
