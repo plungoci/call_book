@@ -15,6 +15,7 @@ from call_book.services.propagation_cache import PropagationCache
 from call_book.services.propagation_estimator import PropagationEstimator, evaluate_band_conditions
 from call_book.services.space_weather_service import (
     GFZ_ENDPOINT,
+    HAMQSL_ENDPOINT,
     NOAA_ENDPOINTS,
     NOAA_FALLBACK_ENDPOINTS,
     NRCAN_ENDPOINT,
@@ -23,6 +24,7 @@ from call_book.services.space_weather_service import (
     SpaceWeatherService,
     _latest,
     parse_gfz_nowcast,
+    parse_hamqsl_solar_xml,
     parse_nrcan_solar_flux,
     parse_silso_daily_csv,
 )
@@ -203,6 +205,78 @@ class PropagationEstimatorTests(TestCase):
             "20260729    230000      2461251.447   2313.86         0145.1       0149.5       0134.5"
         )
         self.assertEqual(parse_nrcan_solar_flux(payload), 149.5)
+
+    def test_hamqsl_solar_xml_reads_metrics_noaa_could_not_supply(self) -> None:
+        # Real sample from hamqsl.com/solarxml.php.
+        payload = """<solar>
+<solardata>
+<source url="http://www.hamqsl.com/solar.html">N0NBH</source>
+<updated> 30 Jul 2026 1706 GMT</updated>
+<solarflux>143</solarflux>
+<aindex> 5</aindex>
+<kindex> 1</kindex>
+<kindexnt>No Report</kindexnt>
+<xray>M1.8</xray>
+<sunspots>141</sunspots>
+<heliumline>129.2</heliumline>
+<protonflux>13</protonflux>
+<electonflux>1580</electonflux>
+<aurora> 1</aurora>
+<normalization>1.99</normalization>
+<latdegree>67.5</latdegree>
+<solarwind>329.6</solarwind>
+<magneticfield> -2.0</magneticfield>
+<geomagfield>VR QUIET</geomagfield>
+<signalnoise>S0-S1</signalnoise>
+<fof2/>
+<muffactor/>
+<muf>NoRpt</muf>
+</solardata>
+</solar>"""
+        result = parse_hamqsl_solar_xml(payload)
+        self.assertEqual(result["a_index"], 5)
+        assert result["xray_flux"] is not None
+        self.assertAlmostEqual(result["xray_flux"], 1.8e-5)
+        self.assertEqual(result["proton_flux"], 13)
+        self.assertEqual(result["electron_flux"], 1580)
+        self.assertEqual(result["solar_wind_speed"], 329.6)
+        self.assertEqual(result["bz"], -2.0)
+        # HamQSL's "aurora" is a unitless 1-10 activity index, not the
+        # OVATION percentage auroral_activity represents elsewhere — must
+        # not be silently mapped in under the wrong unit.
+        self.assertNotIn("aurora", result)
+        self.assertNotIn("auroral_activity", result)
+
+    def test_hamqsl_only_fills_gaps_noaa_left_empty(self) -> None:
+        def fake_get(url: str, as_json: bool = True) -> Any:
+            if url == NOAA_ENDPOINTS["kp"]:
+                return [{"kp_index": "3", "a_running": "77"}]
+            if url == HAMQSL_ENDPOINT:
+                return (
+                    "<solar><solardata><aindex>5</aindex><xray>M1.8</xray>"
+                    "<protonflux>13</protonflux><electonflux>1580</electonflux>"
+                    "<solarwind>329.6</solarwind><magneticfield>-2.0</magneticfield>"
+                    "</solardata></solar>"
+                )
+            if url in (SILSO_ENDPOINT, GFZ_ENDPOINT, NRCAN_ENDPOINT):
+                raise SpaceWeatherError("indisponibil")
+            return [] if as_json else ""
+
+        with TemporaryDirectory() as directory:
+            service = SpaceWeatherService(PropagationCache(Path(directory)))
+            service._get = Mock(side_effect=fake_get)
+            weather = service.fetch(force=True)
+            # a_index came from NOAA's own "kp" endpoint (a_running=77) — HamQSL
+            # (aindex=5) must not clobber a value NOAA already supplied.
+            self.assertEqual(weather.a_index, 77)
+            # xray_flux/proton_flux/electron_flux/solar_wind_speed/bz had no
+            # NOAA value at all in this scenario, so HamQSL fills them in.
+            assert weather.xray_flux is not None
+            self.assertAlmostEqual(weather.xray_flux, 1.8e-5)
+            self.assertEqual(weather.proton_flux, 13)
+            self.assertEqual(weather.electron_flux, 1580)
+            self.assertEqual(weather.solar_wind_speed, 329.6)
+            self.assertEqual(weather.bz, -2.0)
 
     def test_band_detector_covers_requested_hf_vhf_and_uhf_bands(self) -> None:
         cases = (
