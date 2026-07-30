@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
 
 from .models import QSO
-from .propagation import PROPAGATION_MODES, SATELLITE_PROPAGATION
+from .propagation import PROPAGATION_MODES
 
 BAND_RANGES = (
     (1.8, 2.0, "160m"),
@@ -72,13 +71,6 @@ def frequency_range_for_band(band: str) -> str | None:
     return None
 
 
-def parse_utc(value: str) -> datetime:
-    result = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    if result.tzinfo is None:
-        raise ValueError("Data/ora UTC trebuie să conțină fusul orar (+00:00).")
-    return result
-
-
 def validate_qso(qso: QSO) -> QSO:
     qso.callsign = validate_callsign(qso.callsign)
     qso.operator_name = normalize_name(qso.operator_name)
@@ -86,23 +78,9 @@ def validate_qso(qso: QSO) -> QSO:
         raise ValueError("Frecvența trebuie să fie mai mare decât zero.")
     if not qso.mode.strip():
         raise ValueError("Selectați un mod.")
-    if qso.power_w is not None and qso.power_w <= 0:
-        raise ValueError("Puterea trebuie să fie pozitivă.")
     if qso.propagation_mode not in PROPAGATION_MODES:
         raise ValueError("Tip de propagare invalid.")
-    if qso.distance_km is not None and qso.distance_km <= 0:
-        raise ValueError("Distanța trebuie să fie mai mare decât zero.")
-    if qso.azimuth_deg is not None and not 0 <= qso.azimuth_deg <= 360:
-        raise ValueError("Azimutul trebuie să fie între 0 și 360 de grade.")
-    if qso.propagation_mode == SATELLITE_PROPAGATION:
-        if not qso.satellite_name.strip():
-            raise ValueError("Numele satelitului este obligatoriu pentru propagarea prin satelit.")
-        if not qso.uplink_mode.strip() or not qso.downlink_mode.strip():
-            raise ValueError("Modurile uplink și downlink sunt obligatorii pentru propagarea prin satelit.")
     if qso.grid_square and not GRID_RE.fullmatch(qso.grid_square.strip()):
         raise ValueError("Locator Maidenhead invalid.")
-    start = parse_utc(qso.qso_start_utc)
-    if qso.qso_end_utc and parse_utc(qso.qso_end_utc) < start:
-        raise ValueError("Ora de sfârșit nu poate preceda începutul.")
     qso.band = qso.band or band_for_frequency(qso.frequency_mhz)
     return qso

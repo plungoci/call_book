@@ -50,7 +50,6 @@ class QSOFormTests(unittest.TestCase):
             field_groups["Legătură"].index("grid_square"),
             field_groups["Legătură"].index("operator_name") + 1,
         )
-        self.assertNotIn("grid_square", field_groups["Raport și confirmare"])
 
     def test_form_starts_when_a_field_translation_is_missing(self):
         """A translation mistake must not make the whole application unusable."""
@@ -99,13 +98,7 @@ class QSOFormTests(unittest.TestCase):
         self.assertEqual(self.form.value().grid_square, "JO62QN")
 
     def test_callsign_can_be_loaded_serialized_and_cleared(self):
-        qso = QSO(
-            id=7,
-            callsign="YO3ABC",
-            qso_start_utc="2026-01-01T12:00:00+00:00",
-            frequency_mhz=145.5,
-            mode="FM",
-        )
+        qso = QSO(id=7, callsign="YO3ABC", frequency_mhz=145.5, mode="FM")
         self.form.load(qso)
         self.assertEqual(self.form.text("callsign"), "YO3ABC")
         self.assertEqual(self.form.value().callsign, "YO3ABC")
@@ -120,35 +113,16 @@ class QSOFormTests(unittest.TestCase):
 
         self.assertEqual(self.form.text("propagation_mode"), "Satelit")
 
-    def test_optional_groups_are_hidden_until_their_checkboxes_are_selected(self):
-        report_check = self.form.optional_group_checks["Raport și confirmare"]
-        route_check = self.form.optional_group_checks["Timp și traseu"]
+    def test_repeater_dropdown_matches_mode_and_propagation_mode_behavior(self):
+        # Repeater must open/select/close exactly like Mode and Propagation
+        # mode: a plain, non-editable QComboBox that opens on any click.
+        repeater = self.form.fields["repeater"]
+        mode = self.form.fields["mode"]
+        propagation_mode = self.form.fields["propagation_mode"]
 
-        self.assertFalse(report_check.isChecked())
-        self.assertTrue(self.form.optional_group_boxes["Raport și confirmare"].isHidden())
-        self.assertFalse(route_check.isChecked())
-        self.assertTrue(self.form.optional_group_boxes["Timp și traseu"].isHidden())
-
-        report_check.setChecked(True)
-        route_check.setChecked(True)
-
-        self.assertFalse(self.form.optional_group_boxes["Raport și confirmare"].isHidden())
-        self.assertFalse(self.form.optional_group_boxes["Timp și traseu"].isHidden())
-
-    def test_loading_a_qso_keeps_optional_groups_hidden(self):
-        qso = QSO(
-            id=7,
-            callsign="YO3ABC",
-            frequency_mhz=145.5,
-            mode="FM",
-            qso_start_utc="2026-01-01T12:00:00+00:00",
-            rst_sent="59",
-        )
-
-        self.form.load(qso)
-
-        self.assertFalse(self.form.optional_group_checks["Raport și confirmare"].isChecked())
-        self.assertFalse(self.form.optional_group_checks["Timp și traseu"].isChecked())
+        self.assertFalse(repeater.isEditable())
+        self.assertEqual(repeater.isEditable(), mode.isEditable())
+        self.assertEqual(repeater.isEditable(), propagation_mode.isEditable())
 
     def test_repeater_dropdown_is_populated_on_form_creation(self):
         def repeaters():
@@ -174,12 +148,7 @@ class QSOFormTests(unittest.TestCase):
     def test_loaded_callsign_can_be_edited_and_saved(self):
         with tempfile.TemporaryDirectory() as directory:
             database = Database(Path(directory) / "logbook.db")
-            qso = QSO(
-                callsign="YO3ABC",
-                qso_start_utc="2026-01-01T12:00:00+00:00",
-                frequency_mhz=145.5,
-                mode="FM",
-            )
+            qso = QSO(callsign="YO3ABC", frequency_mhz=145.5, mode="FM")
             qso_id = database.save_qso(qso)
 
             self.form.load(database.get_qso(qso_id))
