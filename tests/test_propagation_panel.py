@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
@@ -13,12 +14,16 @@ from call_book.services.band_detector import BandDetector
 from call_book.services.propagation_cache import PropagationCache
 from call_book.services.propagation_estimator import PropagationEstimator, evaluate_band_conditions
 from call_book.services.space_weather_service import (
+    GFZ_ENDPOINT,
     NOAA_ENDPOINTS,
     NOAA_FALLBACK_ENDPOINTS,
+    NRCAN_ENDPOINT,
+    SILSO_ENDPOINT,
     SpaceWeatherError,
     SpaceWeatherService,
     _latest,
     parse_gfz_nowcast,
+    parse_nrcan_solar_flux,
     parse_silso_daily_csv,
 )
 from call_book.ui.propagation_panel import PropagationPanel, Worker
@@ -49,6 +54,26 @@ class SpaceWeatherTests(TestCase):
             service._get = Mock(side_effect=SpaceWeatherError("timeout"))
             with self.assertRaises(SpaceWeatherError):
                 service.fetch(force=True)
+
+    def test_nrcan_solar_flux_overrides_noaas_when_both_are_available(self) -> None:
+        # NOAA's solar_flux is behind an AWS WAF bot challenge that's not
+        # always solvable (see space_weather_service module docstring); NRCan
+        # is treated as the preferred source when it does respond, the same
+        # way SILSO/GFZ already take priority over NOAA's own copies.
+        def fake_get(url: str, as_json: bool = True) -> Any:
+            if url == NOAA_ENDPOINTS["solar"]:
+                return [{"f10.7": "145", "ssn": "96"}]
+            if url == NRCAN_ENDPOINT:
+                return "20260729 230000 2461251.447 2313.86 0145.1 0149.5 0134.5"
+            if url in (SILSO_ENDPOINT, GFZ_ENDPOINT):
+                raise SpaceWeatherError("indisponibil")
+            return [] if as_json else ""
+
+        with TemporaryDirectory() as directory:
+            service = SpaceWeatherService(PropagationCache(Path(directory)))
+            service._get = Mock(side_effect=fake_get)
+            weather = service.fetch(force=True)
+            self.assertEqual(weather.solar_flux, 149.5)
 
     def test_get_reports_a_snippet_when_a_200_response_is_not_valid_json(self) -> None:
         # Regression test: a WAF/proxy/captive-portal answering with an empty
@@ -167,6 +192,17 @@ class PropagationEstimatorTests(TestCase):
             "2026 07 30 15.0 15.250 34333 34333.635 2.7 12 1\n2026 07 30 21.0 21.250 34333 34333.885 -1.000 -1 0\n"
         )
         self.assertEqual(parse_gfz_nowcast(payload), (2.7, 12))
+
+    def test_nrcan_solar_flux_reads_the_latest_adjusted_flux_column(self) -> None:
+        # Real sample from spaceweather.gc.ca/solar_flux_data/daily_flux_values/
+        # fluxtable.txt: "fluxdate fluxtime fluxjulian fluxcarrington fluxobsflux
+        # fluxadjflux fluxursi" — fluxadjflux (6th column, index 5) is the
+        # 1 AU-corrected value ham-radio SFI reports refer to as "solar flux".
+        payload = (
+            "20260729    200000      2461251.322   2313.86         0142.8       0147.1       0132.4    \n"
+            "20260729    230000      2461251.447   2313.86         0145.1       0149.5       0134.5"
+        )
+        self.assertEqual(parse_nrcan_solar_flux(payload), 149.5)
 
     def test_band_detector_covers_requested_hf_vhf_and_uhf_bands(self) -> None:
         cases = (

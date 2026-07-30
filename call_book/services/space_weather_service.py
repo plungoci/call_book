@@ -1,8 +1,10 @@
 """Resilient public space-weather clients and conservative aggregation.
 
 Each provider is optional: NOAA SWPC supplies near-real-time solar-wind and
-GOES products, SILSO supplies the official daily sunspot number, and GFZ
-supplies Kp/Ap nowcast.  No credentials or personal data are sent.
+GOES products, SILSO supplies the official daily sunspot number, GFZ supplies
+Kp/Ap nowcast, and NRCan (Space Weather Canada) supplies the F10.7 solar
+flux index as an alternative to NOAA's own copy.  No credentials or personal
+data are sent.
 """
 
 from __future__ import annotations
@@ -39,6 +41,7 @@ NOAA_FALLBACK_ENDPOINTS = {
 }
 SILSO_ENDPOINT = "https://www.sidc.be/SILSO/INFO/sndtotcsv.php"
 GFZ_ENDPOINT = "https://kp.gfz-potsdam.de/app/files/Kp_ap_nowcast.txt"
+NRCAN_ENDPOINT = "https://spaceweather.gc.ca/solar_flux_data/daily_flux_values/fluxtable.txt"
 LOG = logging.getLogger(__name__)
 # SILSO's daily sunspot-number feed is the full series back to 1818 (not a
 # recent window like the other providers), several megabytes on its own; the
@@ -153,6 +156,24 @@ def parse_gfz_nowcast(payload: str) -> tuple[float | None, float | None]:
         if kp is not None and kp >= 0 and ap is not None and ap >= 0:
             return kp, ap
     return None, None
+
+
+def parse_nrcan_solar_flux(payload: str) -> float | None:
+    """Read the latest 1 AU-adjusted F10.7 solar flux from NRCan's fluxtable.txt.
+
+    Each data row is "fluxdate fluxtime fluxjulian fluxcarrington fluxobsflux
+    fluxadjflux fluxursi" (7 whitespace-separated columns); fluxadjflux (the
+    6th column) is the distance-corrected value ham-radio SFI reports refer
+    to as "solar flux", not the raw fluxobsflux reading.
+    """
+    for line in reversed(payload.splitlines()):
+        parts = line.split()
+        if len(parts) < 6 or not (parts[0].isdigit() and len(parts[0]) == 8):
+            continue
+        value = _number(parts[5])
+        if value is not None and value >= 0:
+            return value
+    return None
 
 
 class SpaceWeatherService:
@@ -286,6 +307,13 @@ class SpaceWeatherService:
             gfz_kp = gfz_ap = None
             statuses["GFZ Potsdam"] = "unavailable"
             LOG.warning("GFZ Potsdam indisponibil: %s", exc)
+        try:
+            nrcan_flux = parse_nrcan_solar_flux(self._get(NRCAN_ENDPOINT, as_json=False))
+            statuses["NRCan"] = "available" if nrcan_flux is not None else "no valid value"
+        except Exception as exc:
+            nrcan_flux = None
+            statuses["NRCan"] = "unavailable"
+            LOG.warning("NRCan indisponibil: %s", exc)
         units = {
             "kp_index": "Kp",
             "a_index": "A",
@@ -316,6 +344,9 @@ class SpaceWeatherService:
         if gfz_ap is not None:
             selected["ap_index"] = gfz_ap
             sources["ap_index"] = "GFZ Potsdam"
+        if nrcan_flux is not None:
+            selected["solar_flux"] = nrcan_flux
+            sources["solar_flux"] = "Space Weather Canada (NRCan)"
         selected["dynamic_pressure"] = None
         if not any(value is not None for value in selected.values()):
             raise SpaceWeatherError("Niciun furnizor de date nu a răspuns cu valori valide.")
