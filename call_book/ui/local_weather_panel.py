@@ -71,9 +71,7 @@ class LocalWeatherPanel(QGroupBox):
         self.humidity_label.setText(f"{w.humidity_percent:.0f}%" if w.humidity_percent is not None else "N/A")
         self.condition_label.setText(w.condition or "N/A")
         self.wind_label.setText(
-            f"{w.wind_speed_knots:.0f} kt / {w.wind_speed_kmh:.1f} km/h"
-            if w.wind_speed_knots is not None
-            else "N/A"
+            f"{w.wind_speed_knots:.0f} kt / {w.wind_speed_kmh:.1f} km/h" if w.wind_speed_knots is not None else "N/A"
         )
 
     def shutdown(self):

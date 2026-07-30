@@ -64,9 +64,7 @@ class LocalWeatherServiceTests(TestCase):
         self.assertIsNone(result.condition)
 
     def test_unavailable_metar_leaves_wind_unset(self) -> None:
-        weather = FakeResponse(
-            b'{"current": {"temperature_2m": 10, "relative_humidity_2m": 40, "weather_code": 0}}'
-        )
+        weather = FakeResponse(b'{"current": {"temperature_2m": 10, "relative_humidity_2m": 40, "weather_code": 0}}')
         with patch(
             "call_book.services.local_weather_service.curl_requests.get",
             side_effect=(weather, FakeResponse(b"[]")),
