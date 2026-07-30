@@ -11,12 +11,10 @@ import csv
 import io
 import json
 import logging
-import socket
 import time
 from datetime import UTC, datetime
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from ..propagation_models import SpaceWeatherData, WeatherValue
@@ -47,24 +45,6 @@ _MAX_RESPONSE_BYTES = 1_000_000
 
 class SpaceWeatherError(RuntimeError):
     pass
-
-
-class InternetConnectionError(SpaceWeatherError):
-    pass
-
-
-def check_internet_connection(url: str, timeout_seconds: float = 4) -> None:
-    parsed = urlparse(url)
-    if parsed.scheme != "https" or not parsed.hostname:
-        raise InternetConnectionError("URL de date meteo spațiale invalid.")
-    try:
-        addresses = socket.getaddrinfo(parsed.hostname, parsed.port or 443, type=socket.SOCK_STREAM)
-        # getaddrinfo's sockaddr is a ready-to-use (host, port[, flowinfo, scopeid])
-        # tuple; create_connection's stub only advertises the 2-tuple form it forwards on.
-        with socket.create_connection(addresses[0][4], timeout=timeout_seconds):  # type: ignore[arg-type]
-            pass
-    except (socket.gaierror, OSError) as exc:
-        raise InternetConnectionError("Nu există conexiune la internet.") from exc
 
 
 def _number(value: Any, field: str = "value") -> float | None:
@@ -166,15 +146,10 @@ class SpaceWeatherService:
     def __init__(self, cache: PropagationCache | None = None, session: Any | None = None) -> None:
         self.cache = cache or PropagationCache()
         self.session = session
-        self._checked_hosts: set[str] = set()
         self._noaa_sources: dict[str, str] = {}
         self._noaa_observed: dict[str, datetime] = {}
 
     def _get(self, url: str, as_json: bool = True) -> Any:
-        host = urlparse(url).hostname or ""
-        if host not in self._checked_hosts:
-            check_internet_connection(url)
-            self._checked_hosts.add(host)
         last: Exception | None = None
         for attempt in range(2):
             try:
@@ -270,7 +245,6 @@ class SpaceWeatherService:
         cached = None if force else self.cache.read_json(self.cache.weather_path(), 900)
         if cached:
             return self._from_dict(cached)
-        self._checked_hosts.clear()
         self._noaa_sources = {}
         self._noaa_observed = {}
         now = datetime.now(UTC)
@@ -280,15 +254,17 @@ class SpaceWeatherService:
         try:
             silso = parse_silso_daily_csv(self._get(SILSO_ENDPOINT, as_json=False))
             statuses["SILSO"] = "available" if silso is not None else "no valid value"
-        except Exception:
+        except Exception as exc:
             silso = None
             statuses["SILSO"] = "unavailable"
+            LOG.warning("SILSO indisponibil: %s", exc)
         try:
             gfz_kp, gfz_ap = parse_gfz_nowcast(self._get(GFZ_ENDPOINT, as_json=False))
             statuses["GFZ Potsdam"] = "available" if gfz_kp is not None else "no valid value"
-        except Exception:
+        except Exception as exc:
             gfz_kp = gfz_ap = None
             statuses["GFZ Potsdam"] = "unavailable"
+            LOG.warning("GFZ Potsdam indisponibil: %s", exc)
         units = {
             "kp_index": "Kp",
             "a_index": "A",

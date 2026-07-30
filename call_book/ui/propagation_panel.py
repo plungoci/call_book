@@ -1,5 +1,6 @@
 """Thread-safe Qt propagation dashboard."""
 
+import logging
 from datetime import UTC, datetime
 
 from PySide6.QtCore import QObject, QThread, QTimer, Signal
@@ -18,6 +19,8 @@ from ..services.propagation_estimator import PropagationEstimator
 from ..services.space_weather_service import SpaceWeatherService
 from ..validators import frequency_range_for_band
 
+LOG = logging.getLogger(__name__)
+
 
 class Worker(QObject):
     finished = Signal(object)
@@ -31,6 +34,7 @@ class Worker(QObject):
         try:
             self.finished.emit(SpaceWeatherService().fetch(self.force))
         except Exception:
+            LOG.warning("Actualizarea condițiilor de propagare a eșuat.", exc_info=True)
             self.failed.emit()
 
 
