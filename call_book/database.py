@@ -178,7 +178,7 @@ CREATE TABLE IF NOT EXISTS operator_profile (
         sql = (
             "SELECT q.*, r.name repeater_name FROM qsos q LEFT JOIN repeaters r ON r.id=q.repeater_id"
             + (" WHERE " + " AND ".join(where) if where else "")
-            + " ORDER BY q.qso_start_utc DESC"
+            + " ORDER BY q.id ASC"
         )
         with self.connect() as c:
             return c.execute(sql, values).fetchall()

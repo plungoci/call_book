@@ -83,6 +83,20 @@ class LogbookTests(unittest.TestCase):
             db.delete_qso(ident)
             self.assertEqual(db.list_qsos(), [])
 
+    def test_list_qsos_orders_by_id_ascending(self):
+        # Regression test: the table used to sort by qso_start_utc DESC
+        # (newest first), which the log's ID column then also showed
+        # descending since insertion order tracks both ID and timestamp.
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Database(Path(tmp) / "test.db")
+            first = db.save_qso(validate_qso(self.qso(callsign="yo3aaa")))
+            second = db.save_qso(validate_qso(self.qso(callsign="yo3bbb")))
+            third = db.save_qso(validate_qso(self.qso(callsign="yo3ccc")))
+
+            rows = db.list_qsos()
+
+            self.assertEqual([row["id"] for row in rows], [first, second, third])
+
     def test_reset_id_sequences_starts_empty_tables_at_one(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = Database(Path(tmp) / "test.db")

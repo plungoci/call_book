@@ -234,6 +234,22 @@ class QSOFormTests(unittest.TestCase):
             self.assertEqual(window.form.weather_panel.location_provider(), (46.77, 23.6))
             window.close()
 
+    def test_search_filters_are_hidden_until_the_search_button_is_toggled(self):
+        # Regression test: filters used to always occupy the top of the tab;
+        # they now live behind a "Căutare" toggle, collapsed by default.
+        with tempfile.TemporaryDirectory() as directory:
+            window = MainWindow(Database(Path(directory) / "logbook.db"), load_config())
+
+            self.assertTrue(window.filters_container.isHidden())
+
+            window.search_button.setChecked(True)
+            self.assertFalse(window.filters_container.isHidden())
+
+            window.search_button.setChecked(False)
+            self.assertTrue(window.filters_container.isHidden())
+
+            window.close()
+
     def test_show_propagation_panel_false_hides_the_tab(self):
         # Regression test: this documented config setting had no effect at all
         # before; the "Propagare" tab was always shown regardless of its value.

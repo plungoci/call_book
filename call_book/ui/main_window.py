@@ -117,24 +117,6 @@ class MainWindow(QMainWindow):
 
     def _log(self):
         layout = QVBoxLayout(self.log)
-        self.filters_edits = {}
-        filters = QHBoxLayout()
-        for key, label in [
-            ("callsign", "Indicativ"),
-            ("band", "Bandă"),
-            ("mode", "Mod"),
-            ("repeater_id", "Repetor ID"),
-            ("date_from", "De la"),
-            ("date_to", "Până la"),
-        ]:
-            e = QLineEdit()
-            e.setPlaceholderText(label)
-            filters.addWidget(e)
-            self.filters_edits[key] = e
-        b = QPushButton("Aplică filtre")
-        b.clicked.connect(self.refresh)
-        filters.addWidget(b)
-        layout.addLayout(filters)
         self.form = QSOForm(
             self.db.list_repeaters, lambda: (self.operator_profile.latitude, self.operator_profile.longitude)
         )
@@ -150,8 +132,37 @@ class MainWindow(QMainWindow):
             b = QPushButton(name)
             b.clicked.connect(fn)
             actions.addWidget(b)
+        self.search_button = QPushButton("Căutare")
+        self.search_button.setCheckable(True)
+        actions.addWidget(self.search_button)
         actions.addStretch()
         layout.addLayout(actions)
+
+        # Hidden until "Căutare" is toggled, instead of always occupying the
+        # top of the tab — the filters are used occasionally, not on every view.
+        self.filters_container = QWidget()
+        self.filters_container.setVisible(False)
+        filters = QHBoxLayout(self.filters_container)
+        filters.setContentsMargins(0, 0, 0, 0)
+        self.filters_edits = {}
+        for key, label in [
+            ("callsign", "Indicativ"),
+            ("band", "Bandă"),
+            ("mode", "Mod"),
+            ("repeater_id", "Repetor ID"),
+            ("date_from", "De la"),
+            ("date_to", "Până la"),
+        ]:
+            e = QLineEdit()
+            e.setPlaceholderText(label)
+            filters.addWidget(e)
+            self.filters_edits[key] = e
+        b = QPushButton("Aplică filtre")
+        b.clicked.connect(self.refresh)
+        filters.addWidget(b)
+        layout.addWidget(self.filters_container)
+        self.search_button.toggled.connect(self.filters_container.setVisible)
+
         self.table = QTableWidget(0, 11)
         self.table.setHorizontalHeaderLabels(
             (
