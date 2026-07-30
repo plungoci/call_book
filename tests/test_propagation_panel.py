@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 from unittest import TestCase
 from unittest.mock import Mock, patch
+
+from PySide6.QtWidgets import QApplication, QHeaderView
 
 from call_book.propagation_models import SpaceWeatherData
 from call_book.services.band_detector import BandDetector
@@ -168,6 +171,16 @@ class PropagationEstimatorTests(TestCase):
 
     def test_unavailable_values_are_displayed_clearly(self) -> None:
         self.assertEqual(PropagationPanel._format_value(None), "N/A")
+
+    def test_hf_table_columns_size_to_fit_their_header_text(self) -> None:
+        # Regression test: fixed default column widths clipped longer headers
+        # like "Interval frecvență" (rendered as "nterval frecvenți").
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        QApplication.instance() or QApplication([])
+        panel = PropagationPanel()
+        header = panel.table.horizontalHeader()
+        self.assertEqual(header.sectionResizeMode(1), QHeaderView.ResizeMode.ResizeToContents)
+        self.assertTrue(header.stretchLastSection())
 
     def test_worker_logs_the_fetch_failure_before_signaling(self) -> None:
         # Regression test: a bare "except Exception: self.failed.emit()" gave

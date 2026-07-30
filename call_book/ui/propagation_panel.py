@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QPushButton,
     QTableWidget,
@@ -86,6 +87,12 @@ class PropagationPanel(QGroupBox):
         self.table.setHorizontalHeaderLabels(("Bandă", "Interval frecvență", "Zi", "Noapte", "Scor", "Încredere"))
         self.table.setVerticalHeaderLabels(("80m", "40m", "20m", "15m", "10m"))
         self.table.verticalHeader().setVisible(False)
+        # Default column widths are too narrow for headers like "Interval
+        # frecvență", clipping them; size each column to fit its header/cell
+        # content and let the last column absorb any remaining width.
+        horizontal_header = self.table.horizontalHeader()
+        horizontal_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        horizontal_header.setStretchLastSection(True)
         layout.addWidget(self.table)
 
     @staticmethod
