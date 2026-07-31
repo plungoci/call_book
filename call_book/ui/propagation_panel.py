@@ -85,10 +85,9 @@ class PropagationPanel(QGroupBox):
         self.table.verticalHeader().setVisible(False)
         # Default column widths are too narrow for headers like "Interval
         # frecvență", clipping them; size each column to fit its header/cell
-        # content and let the last column absorb any remaining width.
+        # content instead of stretching one column to fill the panel.
         horizontal_header = self.table.horizontalHeader()
         horizontal_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        horizontal_header.setStretchLastSection(True)
         layout.addWidget(self.table)
 
     @staticmethod
