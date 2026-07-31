@@ -16,7 +16,7 @@ def main():
     qt_app = QApplication([])
     qt_app.setStyle("Fusion")
     window = MainWindow(Database(), load_config())
-    window.show()
+    window.showMaximized()
     qt_app.exec()
 
 

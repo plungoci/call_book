@@ -70,7 +70,7 @@ Pe Windows, `Launcher.bat` rulează `python launcher.py`.
 
 ## Fereastra principală
 
-Antetul afișează titlul aplicației, locatorul stației (dacă e setat în profilul operatorului) și ceasul local + UTC, actualizat la fiecare secundă. Sub antet sunt file (tab-uri):
+Aplicația pornește maximizată. Antetul afișează titlul aplicației, locatorul stației (dacă e setat în profilul operatorului) și ceasul local + UTC, actualizat la fiecare secundă. Sub antet sunt file (tab-uri):
 
 - **Jurnal QSO** — jurnalul propriu-zis: filtre, formular și tabelul de legături.
 - **Propagare** — panoul de condiții de propagare (afișat doar dacă `show_propagation_panel` este activat în `config.json`; vezi [Panou condiții de propagare](#panou-condiții-de-propagare)).
@@ -163,12 +163,12 @@ Lângă formular, panoul **Vreme locală** afișează temperatura, umiditatea ș
 
 ### Benzi și frecvențe
 
-În dreapta panoului **Vreme locală**, panoul **Benzi și frecvențe (referință)** afișează două tabele statice pentru benzile 160m–70cm, unul lângă altul:
+În dreapta panoului **Vreme locală**, panoul **Benzi și frecvențe (referință)** afișează segmentele exacte ale tabelului ANCOM de alocare pentru radioamatori (160m–70cm), în două tabele statice unul lângă altul, într-o zonă cu derulare verticală proprie (cele 24 de segmente nu încap dintr-o dată nici pe un monitor mare, dar restul tab-ului Jurnal QSO rămâne la dimensiunea normală):
 
-* **Radioamator (NG)** — benzile alocate radioamatorilor (statut neguvernamental), cu intervalul de frecvență și tipul alocării (primară/secundară/bandă WARC).
-* **Alocare partajată / guvernamentală (informativ)** — pentru fiecare bandă, ce alt serviciu (fix, maritim mobil, guvernamental, radiolocație etc.) partajează sau are prioritate asupra ei conform Reglementărilor radio ITU; nu este o listă exhaustivă sau clasificată de sisteme militare specifice.
+* **Radioamator — toate segmentele** — toate cele 24 de segmente de frecvență din tabelul ANCOM, cu limitele exacte (MHz) și statutul benzii (Primară/Secundară); fiecare segment este alocat radioamatorilor, unele fiind partajate suplimentar cu utilizare guvernamentală.
+* **Segmente partajate cu utilizare guvernamentală** — doar cele 8 segmente din tabelul de mai sus care poartă și un cod guvernamental ANCOM (`G` sau `G(A)`), cu codul exact și statutul benzii; util pentru a ști exact unde emiți alături de o altă alocare, nu doar exclusiv ca radioamator.
 
-Ambele tabele sunt date statice (planul de benzi IARU Regiunea 1, aceleași la fiecare pornire, nicio cerere de rețea) și sunt dimensionate să afișeze toate cele 14 rânduri fără scroll — de aceea fereastra principală are o dimensiune implicită și minimă generoasă. Verifică întotdeauna reglementarea ANCOM curentă înainte de a folosi aceste date pentru decizii de licențiere.
+Datele sunt statice (tabelul ANCOM pentru radioamatori, aceleași la fiecare pornire, nicio cerere de rețea) — nu este o listă exhaustivă sau clasificată de sisteme militare specifice, ci exact codurile de partajare publicate de ANCOM. Notele `*`, `**`, `(1)`, `(2)`, `(3)` din sursă sunt păstrate ca atare în tabel, fără textul explicativ al notelor. Verifică întotdeauna reglementarea ANCOM curentă înainte de a folosi aceste date pentru decizii de licențiere.
 
 ## Meniul Fișier
 
