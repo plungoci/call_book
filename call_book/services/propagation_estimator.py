@@ -6,7 +6,7 @@ from datetime import datetime
 
 from ..propagation_models import BandCondition, SpaceWeatherData
 
-PANEL_BANDS = ("80m", "40m", "20m", "15m", "10m", "2m", "70cm")
+PANEL_BANDS = ("160m", "80m", "40m", "20m", "15m", "10m", "2m", "70cm")
 _ALL_HF_BANDS = {"160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m"}
 
 

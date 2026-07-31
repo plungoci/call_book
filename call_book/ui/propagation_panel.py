@@ -79,9 +79,9 @@ class PropagationPanel(QGroupBox):
             label.setWordWrap(True)
             self.metrics.addWidget(label, i // 4, i % 4)
             self.metric_labels[name] = label
-        self.table = QTableWidget(7, 6)
+        self.table = QTableWidget(8, 6)
         self.table.setHorizontalHeaderLabels(("Bandă", "Interval frecvență", "Zi", "Noapte", "Scor", "Încredere"))
-        self.table.setVerticalHeaderLabels(("80m", "40m", "20m", "15m", "10m", "2m", "70cm"))
+        self.table.setVerticalHeaderLabels(("160m", "80m", "40m", "20m", "15m", "10m", "2m", "70cm"))
         self.table.verticalHeader().setVisible(False)
         # Default column widths are too narrow for headers like "Interval
         # frecvență", clipping them; size each column to fit its header/cell
