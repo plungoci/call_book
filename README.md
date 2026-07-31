@@ -1,13 +1,13 @@
 # Radio Logbook
 <p align="center">
-  <img src="preview.png" alt="GUI" width="100%">
+  <img src="docs/screenshots/jurnal-qso.png" alt="Tab-ul Jurnal QSO, cu filtrele de căutare deschise și panoul Vreme locală" width="100%">
 </p>
 
 Aplicație desktop locală/offline pentru evidența legăturilor radioamatorice (QSO), scrisă în Python cu PySide6 (Qt for Python). Datele sunt păstrate în SQLite; Excel este folosit numai pentru export, nu ca sursă de date.
 
 ## Prezentare vizuală
 
-Imaginea de mai sus prezintă într-un singur cadru principalele zone ale aplicației: formularul de introducere a unui QSO, filtrele de căutare, acțiunile rapide și tabelul jurnalului. Galeria folosește numai captura `preview.png` deja existentă în repository, astfel încât modificarea documentației nu adaugă fișiere binare noi în pull request.
+Imaginea de mai sus prezintă tab-ul **Jurnal QSO**: formularul de introducere a unui QSO, panoul **Vreme locală**, filtrele de căutare deschise și tabelul jurnalului. Restul capturilor din `docs/screenshots/` sunt plasate lângă secțiunile corespunzătoare din acest document (Locație, Setări, Propagare, Date operator, Repetoare).
 
 ## Funcționalități
 
@@ -93,9 +93,17 @@ Bara de stare de sub tabel arată numărul de QSO-uri afișate sau confirmarea u
 
 Afișează locatorul Maidenhead (sau cel implicit, dacă nu s-a completat unul propriu), latitudinea și longitudinea din profilul operatorului, plus un buton **Deschide profilul operatorului**.
 
+<p align="center">
+  <img src="docs/screenshots/locatie.png" alt="Tab-ul Locație" width="80%">
+</p>
+
 ### Setări
 
 Oferă aceleași acțiuni ca meniul **Setări**, ca listă de butoane: Date operator, Administrează repetoare, Setări propagare, Setări vreme locală, Creează backup, Resetează numerotarea ID-urilor.
+
+<p align="center">
+  <img src="docs/screenshots/setari.png" alt="Tab-ul Setări" width="80%">
+</p>
 
 ## Formularul QSO
 
@@ -116,9 +124,27 @@ Câmpurile **Repetor**, **Mod** și **Propagare** sunt combobox-uri needitabile 
 
 ### Sugestia automată de propagare
 
-Câmpul **Propagare** primește o sugestie implicită de fiecare dată când se schimbă banda, modul sau repetorul selectat, pe baza unor reguli fixe (de exemplu F2 pentru 20–10m, NVIS pentru 80/60/40m, Sporadic-E pentru 6m, Repeater la alegerea unui repetor, EchoLink/AllStar/DMR/D-STAR/C4FM la modurile de rețea corespunzătoare, Meteor Scatter pentru MSK144 pe VHF).
+Câmpul **Propagare** primește o sugestie implicită de fiecare dată când se schimbă banda, modul sau repetorul selectat, verificate în această ordine:
 
-O alegere manuală a utilizatorului este protejată: odată ce ai selectat manual un mod de propagare, schimbările ulterioare de bandă sau mod nu-l mai suprascriu automat — cu excepția selectării unui **repetor**, considerată un context suficient de semnificativ încât să suprascrie și o alegere manuală (regula acoperă și propagarea prin satelit, dar formularul actual nu are un control dedicat care să declanșeze acea sugestie automat; „Satelit” rămâne disponibil doar ca alegere manuală din listă). La încărcarea unui QSO existent pentru editare, valoarea salvată este tratată ca o alegere manuală (protejată). La **QSO nou**, valoarea de propagare a QSO-ului anterior este păstrată ca punct de plecare (operatorii loghează adesea mai multe legături consecutive pe același traseu de propagare), dar sugestia redevine activă pentru noua înregistrare.
+1. **Repetor selectat** → `Repeater`.
+2. **Mod de rețea** (`EchoLink`, `AllStar`, `DMR`, `D-STAR`, `C4FM`, `Internet Gateway`) → modul respectiv, identic.
+3. **MSK144** pe 6m, 4m sau 2m → `Meteor Scatter`.
+4. **FM** pe 6m, 4m, 2m, 1.25m, 70cm sau 23cm → `Directă`.
+5. Altfel, valoarea implicită a benzii:
+
+   | Bandă | Sugestie |
+   |---|---|
+   | 2200m, 630m, 160m | `Ground Wave` |
+   | 80m, 60m, 40m | `NVIS` |
+   | 30m, 20m, 17m, 15m, 12m, 10m | `F2` |
+   | 6m | `Sporadic-E` |
+   | 4m | `Tropospheric` |
+   | 2m | `Directă` |
+   | oricare alta / bandă necunoscută | `Necunoscută` |
+
+`Satelit` există în listă doar ca alegere manuală — regula de suprascriere de mai jos îl acoperă, dar niciun câmp din formular nu declanșează automat această sugestie.
+
+O alegere manuală e protejată: odată selectat manual un mod de propagare, schimbările ulterioare de bandă sau mod nu-l mai suprascriu — cu o singură excepție, alegerea unui **repetor**, considerată un context suficient de semnificativ încât să suprascrie și o valoare manuală. La încărcarea unui QSO existent pentru editare, valoarea salvată e tratată ca manuală (protejată). La **QSO nou**, valoarea de propagare a QSO-ului anterior e păstrată ca punct de plecare (operatorii loghează adesea mai multe legături consecutive pe același traseu), dar sugestia redevine activă pentru noua înregistrare.
 
 ### Validare la salvare
 
@@ -133,7 +159,7 @@ Câmpul intern **locator propriu** (`my_grid_square`) este completat automat, la
 
 ### Vreme locală
 
-Lângă formular, panoul **Vreme locală** afișează temperatura, umiditatea și condițiile curente la poziția stației (latitudine/longitudine din profilul operatorului), preluate de la [Open-Meteo](https://open-meteo.com/) — public, fără cheie API. Presiunea atmosferică, viteza și direcția vântului provin din observația METAR a Aeroportului Internațional Sibiu (LRSB), preluată de la Aviation Weather Center; presiunea este afișată în hPa, viteza atât în noduri, cât și în km/h, iar direcția în grade și punct cardinal. Dacă observația METAR nu este disponibilă, presiunea și vântul apar ca `N/A`, fără a ascunde celelalte date meteo. Panoul nu are un buton de actualizare manuală: se actualizează automat, o singură dată la scurt timp după deschiderea aplicației, apoi periodic la fiecare `local_weather_auto_refresh_minutes` (vezi [Setări vreme locală](#setări-vreme-locală)) minute. Dacă poziția stației nu e setată (Setări → Date operator), panoul arată acest lucru în loc să încerce o cerere fără sens. La fel ca panoul de propagare, orice eșec de rețea lasă ultimele valori afișate neschimbate, cu un mesaj de stare clar.
+Lângă formular, panoul **Vreme locală** afișează temperatura, umiditatea și condițiile curente la poziția stației (latitudine/longitudine din profilul operatorului), preluate de la [Open-Meteo](https://open-meteo.com/) — public, fără cheie API. Presiunea atmosferică, viteza și direcția vântului provin din observația METAR a Aeroportului Internațional Sibiu (LRSB), preluată de la Aviation Weather Center; presiunea este afișată în hPa, viteza atât în noduri, cât și în km/h, iar direcția în grade și punct cardinal. Dacă observația METAR nu este disponibilă, presiunea și vântul apar ca `N/A`, fără a ascunde celelalte date meteo. Panoul se actualizează automat, o singură dată la scurt timp după deschiderea aplicației, apoi periodic la fiecare `local_weather_auto_refresh_minutes` (vezi [Setări vreme locală](#setări-vreme-locală)) minute; butonul **Actualizează** apare doar dacă actualizarea automată este dezactivată din setări. Dacă poziția stației nu e setată (Setări → Date operator), panoul arată acest lucru în loc să încerce o cerere fără sens. La fel ca panoul de propagare, orice eșec de rețea lasă ultimele valori afișate neschimbate, cu un mesaj de stare clar.
 
 ## Meniul Fișier
 
@@ -159,6 +185,10 @@ Folosește API-ul nativ `sqlite3.backup()` pentru o copie online, consistentă, 
 
 Deschide **Setări → Date operator** pentru a completa indicativul, numele, locatorul, localitatea, județul, țara, datele de contact, echipamentul radio, antena, puterea implicită, clubul și observațiile. **Salvează** persistă profilul (indicativul și numele sunt normalizate — majuscule, respectiv fiecare cuvânt capitalizat), iar **Resetează** îl golește complet, numai după confirmare.
 
+<p align="center">
+  <img src="docs/screenshots/profil-operator.png" alt="Dialogul Date operator" width="60%">
+</p>
+
 Formularul include și **Latitudine**, **Longitudine**, **Precizie localizare**, **Sursa localizării** și **Locator Maidenhead**. La apăsarea **Detectează locația**, aplicația încearcă mai întâi API-ul local Windows Location pe Windows (fără urmărire în fundal, într-un fir separat ca să nu blocheze interfața). Dacă acesta nu poate furniza o poziție sau pe altă platformă, încearcă explicit o estimare după adresa IP prin endpointul HTTPS configurabil `CALL_BOOK_LOCATION_ENDPOINT` (implicit `https://ipwho.is/`). Estimarea IP poate fi mai puțin precisă. Poți introduce manual coordonatele pe orice platformă și apăsa **Recalculează locatorul** pentru a obține locatorul Maidenhead corespunzător.
 
 Coordonatele, sursa, precizia și momentul actualizării sunt păstrate numai local în SQLite, în profilul operatorului. Doar fallback-ul IP inițiat explicit prin buton contactează serviciul de geolocalizare și îi expune adresa IP; coordonatele rezultate nu sunt exportate ca latitudine/longitudine brută și nu sunt scrise în logurile tehnice. Locatorul operatorului este exportat ADIF ca `MY_GRIDSQUARE` (iar indicativul ca `STATION_CALLSIGN`); locatorul corespondentului rămâne `GRIDSQUARE`.
@@ -169,15 +199,23 @@ Pe laptopuri fără GPS, Windows poate estima poziția din Wi-Fi, rețea sau alt
 
 **Setări → Repetoare** deschide un dialog cu formular (Nume, Frecvență ieșire, Frecvență intrare, Shift, CTCSS, Mod, Locație, Locator, Observații) și un tabel cu repetoarele existente. **Nume** și **Frecvență ieșire (MHz)** sunt obligatorii; lipsa lor afișează o eroare și nu salvează nimic. **Salvează** creează un repetor nou sau îl actualizează pe cel selectat din tabel; **Nou** golește formularul și selecția; **Șterge** cere confirmare și elimină repetorul, păstrând QSO-urile istorice care îl referă (`repeater_id` devine `NULL` pentru acestea). Orice modificare reîmprospătează imediat lista de repetoare din formularul QSO.
 
+<p align="center">
+  <img src="docs/screenshots/repetoare.png" alt="Dialogul Administrare repetoare" width="80%">
+</p>
+
 ### Setări propagare
 
 **Setări → Setări propagare** conține o bifă **Actualizare automată** și un interval configurabil (1, 5, 10, 15, 30 sau 60 de minute), salvate în `config.json` ca `propagation_auto_refresh_minutes`. **Salvează** persistă valoarea și reprogramează imediat actualizarea automată a panoului de propagare (vezi mai jos). Dezactivarea bifei salvează intervalul ca `"0"`, ceea ce oprește actualizarea automată complet.
 
 ### Setări vreme locală
 
-**Setări → Setări vreme locală** funcționează identic cu Setări propagare: o bifă **Actualizare automată** și un interval configurabil (1, 5, 10, 15, 30 sau 60 de minute), salvate în `config.json` ca `local_weather_auto_refresh_minutes` (implicit 30). **Salvează** reprogramează imediat actualizarea automată a panoului **Vreme locală**; dezactivarea bifei salvează `"0"`, oprind actualizarea automată complet. Panoul de vreme locală nu are un buton de actualizare manuală — aceasta este singura cale de a-i schimba cadența.
+**Setări → Setări vreme locală** funcționează identic cu Setări propagare: o bifă **Actualizare automată** și un interval configurabil (1, 5, 10, 15, 30 sau 60 de minute), salvate în `config.json` ca `local_weather_auto_refresh_minutes` (implicit 30). **Salvează** reprogramează imediat actualizarea automată a panoului **Vreme locală**; dezactivarea bifei salvează `"0"`, oprind actualizarea automată complet și afișând butonul **Actualizează** din panou pentru reîmprospătare manuală.
 
 ## Panou condiții de propagare
+
+<p align="center">
+  <img src="docs/screenshots/propagare.png" alt="Tab-ul Propagare" width="100%">
+</p>
 
 Fereastra principală poate conține un panou compact **Condiții de propagare**, nu o hartă — vizibil doar dacă `show_propagation_panel` din `config.json` este `"true"` (implicit). Fiecare valoare disponibilă arată unitatea, furnizorul și vechimea sa; o valoare fără observație verificabilă este **N/A**, niciodată zero. Modelul unificat reține valoarea, unitatea, sursa, momentul UTC, vechimea calculată, calitatea și starea. Tabelul HF calculează separat zi/noapte pentru 80, 40, 20, 15 și 10 m. Este o euristică locală, cu încredere scăzută/medie după acoperirea indicilor: **nu este VOACAP și nu este o predicție garantată**.
 
@@ -252,6 +290,7 @@ call_book/                           pachetul aplicației
   services/local_weather_service.py  client Open-Meteo pentru vremea locală
   ui/                                 interfața PySide6 / Qt for Python
 tests/                                teste unittest (vezi mai jos)
+docs/screenshots/                    capturile de ecran folosite în acest README
 data/ exports/ backups/ cache/        date runtime (negestionate în Git)
 ```
 
