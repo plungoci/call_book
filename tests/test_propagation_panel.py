@@ -180,7 +180,9 @@ class PropagationEstimatorTests(TestCase):
         panel = PropagationPanel()
         header = panel.table.horizontalHeader()
         self.assertEqual(header.sectionResizeMode(1), QHeaderView.ResizeMode.ResizeToContents)
-        self.assertTrue(header.stretchLastSection())
+        # Regression test: stretching the last column ("Încredere") made it
+        # balloon to fill any leftover panel width instead of fitting its content.
+        self.assertFalse(header.stretchLastSection())
 
     def test_worker_logs_the_fetch_failure_before_signaling(self) -> None:
         # Regression test: a bare "except Exception: self.failed.emit()" gave
