@@ -1,4 +1,4 @@
-"""Static reference panel: amateur band plan and shared/governmental allocations."""
+"""Static reference panel: exact ANCOM amateur band segments and which of them are shared with government use."""
 
 from __future__ import annotations
 
@@ -9,27 +9,35 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QScrollArea,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
+    QWidget,
 )
 
-from ..services.band_plan import AMATEUR_BANDS, SHARED_ALLOCATIONS
+from ..services.band_plan import AMATEUR_SEGMENTS, SHARED_SEGMENTS
 
 _CELL_PADDING = 40
 _ROW_PADDING = 10
+_SCROLL_AREA_HEIGHT = 380
+
+
+def _shared_codes(allocation_status):
+    # e.g. "G(A)/G/NG" -> "G(A), G": the non-amateur codes sharing this segment.
+    return ", ".join(code for code in allocation_status.split("/") if code != "NG")
 
 
 def _sized_table(rows):
-    """Build a table sized to show every row/column without scrollbars.
+    """Build a table sized to show every row/column with no internal scrollbars.
 
     A plain QTableWidget doesn't factor its actual row/column sizes into its
-    sizeHint, so without this the surrounding layout squeezes it down to a
-    default size and both scrollbars appear, truncating the reference data.
-    Column/row sizes are measured directly with QFontMetrics rather than via
-    resizeColumnsToContents()/columnWidth(), which report sizes that are too
-    tight (or not yet settled) before the widget has actually been laid out
-    and shown.
+    sizeHint, so without this it gets squeezed down to a default size,
+    truncating the reference data. Column/row sizes are measured directly
+    with QFontMetrics rather than via resizeColumnsToContents()/columnWidth(),
+    which report sizes that are too tight (or not yet settled) before the
+    widget has actually been laid out and shown. The table can still be
+    taller than the panel's visible area — see the enclosing QScrollArea.
     """
     headers = list(rows[0].keys())
     table = QTableWidget(len(rows), len(headers))
@@ -63,36 +71,56 @@ def _sized_table(rows):
 
 
 class BandPlanPanel(QGroupBox):
-    """Quick reference for 160m–70cm: amateur band edges plus shared-use notes.
+    """Exact ANCOM amateur band segments (160m–70cm) and which are shared with government use.
 
-    Static data (see ``services.band_plan``), not a live/fetched table. Every
-    row is sized to fit without scrollbars, so the panel needs a generous
-    amount of space — see MainWindow's default/minimum size.
+    Static data (see ``services.band_plan``), not a live/fetched table. Both
+    tables are sized to show every row without their own scrollbars, but
+    together they're taller than most screens allow even maximized — so the
+    pair sits inside a vertically scrollable area instead of forcing the
+    whole window to grow to fit them.
     """
 
     def __init__(self, parent=None):
         super().__init__("Benzi și frecvențe (referință)", parent)
         layout = QVBoxLayout(self)
 
-        disclaimer = QLabel("Referință generală IARU Regiunea 1 (160m–70cm); verifică reglementarea ANCOM curentă.")
+        disclaimer = QLabel(
+            "Date ANCOM (160m–70cm); verifică reglementarea curentă. Codurile G/G(A) sunt cele din sursă — "
+            "vezi reglementarea ANCOM pentru semnificația exactă. Notele *, **, (1)(2)(3) provin din sursă și "
+            "nu sunt reproduse aici."
+        )
         disclaimer.setWordWrap(True)
         layout.addWidget(disclaimer)
 
-        tables = QHBoxLayout()
-        layout.addLayout(tables)
+        tables_widget = QWidget()
+        tables = QHBoxLayout(tables_widget)
 
-        amateur_box = QGroupBox("Radioamator (NG)")
+        amateur_box = QGroupBox("Radioamator — toate segmentele")
         amateur_layout = QVBoxLayout(amateur_box)
         self.amateur_table = _sized_table(
-            [{"Bandă": e.band, "Frecvență": e.frequency_range, "Note": e.notes} for e in AMATEUR_BANDS]
+            [{"Bandă": e.band, "Frecvență": e.frequency_range, "Statut bandă": e.band_status} for e in AMATEUR_SEGMENTS]
         )
         amateur_layout.addWidget(self.amateur_table)
         tables.addWidget(amateur_box)
 
-        shared_box = QGroupBox("Alocare partajată / guvernamentală (informativ)")
+        shared_box = QGroupBox("Segmente partajate cu utilizare guvernamentală")
         shared_layout = QVBoxLayout(shared_box)
         self.shared_table = _sized_table(
-            [{"Bandă": e.band, "Serviciu partajat/primar": e.primary_or_shared_service} for e in SHARED_ALLOCATIONS]
+            [
+                {
+                    "Bandă": e.band,
+                    "Frecvență": e.frequency_range,
+                    "Partajat cu": _shared_codes(e.allocation_status),
+                    "Statut bandă": e.band_status,
+                }
+                for e in SHARED_SEGMENTS
+            ]
         )
         shared_layout.addWidget(self.shared_table)
         tables.addWidget(shared_box)
+
+        scroll = QScrollArea()
+        scroll.setWidget(tables_widget)
+        scroll.setWidgetResizable(False)
+        scroll.setFixedHeight(_SCROLL_AREA_HEIGHT)
+        layout.addWidget(scroll)

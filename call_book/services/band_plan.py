@@ -1,15 +1,26 @@
-"""Static IARU Region 1 amateur band plan reference data (160m to 70cm).
+"""ANCOM amateur radio band plan reference data (160m to 70cm).
 
-Not fetched live and not tied to any specific external source: these band
-edges are the stable, widely published IARU Region 1 amateur allocations
-that ANCOM's Romanian amateur radio regulation also follows. Always verify
-against the current ANCOM authorization before relying on this for licensing
-decisions — this is a quick reference, not a legal text.
+Sourced from ANCOM's amateur radio frequency allocation table (as provided
+by the user, matching the public band plan also mirrored at
+https://yo3ram.ro/benzi-si-frecvente-ham-radio/), not fetched live. Always
+verify against the current ANCOM authorization before relying on this for
+licensing decisions — this is a quick reference, not a legal text.
 
-The "shared allocation" table is general regulatory context (which primary
-service, if any, shares or borders each band under the ITU Radio
-Regulations) rather than an exhaustive or classified list of specific
-military systems or frequencies.
+Each segment's "allocation_status" is ANCOM's own usage-status code:
+  - "NG"    — neguvernamental: exclusively amateur use in this segment.
+  - "G"     — guvernamental: also allocated to a governmental service.
+  - "G(A)"  — guvernamental, categorie A (see the ANCOM regulation for the
+              precise definition; not assumed/expanded here).
+A segment can carry more than one code (e.g. "G(A)/G/NG") when several
+services share it. Every segment listed here includes "NG" — ANCOM's
+amateur table only lists spectrum amateurs may use, some of it shared with
+government use rather than exclusive. This is not an exhaustive or
+classified list of specific military systems or frequencies, only ANCOM's
+published sharing status per segment.
+
+Footnote markers (*, **, (1), (2), (3)) are preserved verbatim from the
+source table; their explanatory text is not reproduced here — see the
+ANCOM regulation for what each one means.
 """
 
 from __future__ import annotations
@@ -18,48 +29,44 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class AmateurBand:
+class BandSegment:
     band: str
     frequency_range: str
-    notes: str
+    allocation_status: str
+    band_status: str
+
+    @property
+    def is_shared_with_government(self) -> bool:
+        return self.allocation_status != "NG"
 
 
-@dataclass(frozen=True)
-class SharedAllocation:
-    band: str
-    primary_or_shared_service: str
-
-
-AMATEUR_BANDS: tuple[AmateurBand, ...] = (
-    AmateurBand("160m", "1810–2000 kHz", "Secundară; unele țări limitează puterea noaptea"),
-    AmateurBand("80m", "3500–3800 kHz", "Primară în Regiunea 1"),
-    AmateurBand("60m", "5351.5–5366.5 kHz", "Secundară, putere max. 15 W PEP"),
-    AmateurBand("40m", "7000–7200 kHz", "Primară în Regiunea 1"),
-    AmateurBand("30m", "10100–10150 kHz", "Bandă WARC; numai CW/date, fără radiotelefonie"),
-    AmateurBand("20m", "14000–14350 kHz", "Primară"),
-    AmateurBand("17m", "18068–18168 kHz", "Bandă WARC"),
-    AmateurBand("15m", "21000–21450 kHz", "Primară"),
-    AmateurBand("12m", "24890–24990 kHz", "Bandă WARC"),
-    AmateurBand("10m", "28000–29700 kHz", "Primară"),
-    AmateurBand("6m", "50000–52000 kHz", "Secundară în Regiunea 1"),
-    AmateurBand("4m", "70000–70500 kHz", "Alocare recentă; condițiile variază pe țări"),
-    AmateurBand("2m", "144000–146000 kHz", "Primară"),
-    AmateurBand("70cm", "430000–440000 kHz", "Secundară, partajată cu radiolocație"),
+AMATEUR_SEGMENTS: tuple[BandSegment, ...] = (
+    BandSegment("160m", "1.81–1.83 MHz", "G(A)/G/NG", "Primară"),
+    BandSegment("160m", "1.83–1.85 MHz", "NG", "Primară"),
+    BandSegment("160m", "1.85–2 MHz", "G(A)/NG", "Secundară"),
+    BandSegment("80m", "3.5–3.8 MHz", "G(A)/G/NG", "Primară"),
+    BandSegment("60m**", "5.3515–5.3665 MHz", "G(A)/G/NG", "Secundară"),
+    BandSegment("40m", "7–7.1 MHz", "NG", "Primară"),
+    BandSegment("40m", "7.1–7.2 MHz", "NG", "Primară"),
+    BandSegment("30m", "10.1–10.15 MHz", "G(A)/NG", "Secundară"),
+    BandSegment("20m", "14–14.25 MHz", "NG", "Primară"),
+    BandSegment("20m", "14.25–14.35 MHz", "NG", "Primară"),
+    BandSegment("17m", "18.068–18.168 MHz", "NG", "Primară"),
+    BandSegment("15m", "21–21.45 MHz", "NG", "Primară"),
+    BandSegment("12m", "24.89–24.99 MHz", "NG", "Primară"),
+    BandSegment("10m", "28–29.7 MHz", "NG", "Primară"),
+    BandSegment("6m", "50–52 MHz", "G(A)/NG", "Secundară"),
+    BandSegment("4m", "70–70.3 MHz(2)", "G(A)/NG", "Secundară"),
+    BandSegment("2m", "144–144.4 MHz", "NG", "Primară"),
+    BandSegment("2m", "144.4–146 MHz", "NG", "Primară"),
+    BandSegment("70cm", "431.2–432 MHz", "NG", "Primară"),
+    BandSegment("70cm", "432–432.3 MHz", "NG", "Primară"),
+    BandSegment("70cm", "432.3–433.05 MHz", "NG", "Primară"),
+    BandSegment("70cm", "433.05–434.79 MHz", "NG", "Primară"),
+    BandSegment("70cm", "434.79–438 MHz", "G(A)/NG", "Primară"),
+    BandSegment("70cm", "438–440 MHz", "NG", "Primară"),
 )
 
-SHARED_ALLOCATIONS: tuple[SharedAllocation, ...] = (
-    SharedAllocation("160m", "Fix / maritim mobil"),
-    SharedAllocation("80m", "Fix / maritim mobil (în afara sub-benzii radioamator)"),
-    SharedAllocation("60m", "Guvernamental / fix / mobil terestru"),
-    SharedAllocation("40m", "Radiodifuziune (în afara Regiunii 1) / fix"),
-    SharedAllocation("30m", "Fix (radioamatorul e secundar la nivel mondial)"),
-    SharedAllocation("20m", "Fără partajare semnificativă"),
-    SharedAllocation("17m", "Fără partajare semnificativă"),
-    SharedAllocation("15m", "Fără partajare semnificativă"),
-    SharedAllocation("12m", "Fără partajare semnificativă"),
-    SharedAllocation("10m", "Fără partajare semnificativă"),
-    SharedAllocation("6m", "Radiodifuziune TV / radiolocație (variază pe țări)"),
-    SharedAllocation("4m", "Fostă utilizare guvernamentală în unele țări"),
-    SharedAllocation("2m", "Fără partajare semnificativă (cu excepția sub-benzii satelit)"),
-    SharedAllocation("70cm", "Radiolocație, inclusiv radar militar"),
+SHARED_SEGMENTS: tuple[BandSegment, ...] = tuple(
+    segment for segment in AMATEUR_SEGMENTS if segment.is_shared_with_government
 )

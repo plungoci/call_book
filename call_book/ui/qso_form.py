@@ -132,6 +132,10 @@ class QSOForm(QGroupBox):
         grid.addWidget(self.weather_panel, 0, len(FIELD_GROUPS))
         self.band_plan_panel = BandPlanPanel()
         grid.addWidget(self.band_plan_panel, 0, len(FIELD_GROUPS) + 1)
+        # The scroll area inside BandPlanPanel doesn't report a sizeHint wide
+        # enough to claim its fair share automatically; claim leftover width
+        # explicitly so both its inner tables fit side by side when possible.
+        grid.setColumnStretch(len(FIELD_GROUPS) + 1, 1)
 
         self.notes = QTextEdit()
         self.notes.setFixedHeight(72)
