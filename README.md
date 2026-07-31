@@ -79,7 +79,7 @@ Antetul afișează titlul aplicației, locatorul stației (dacă e setat în pro
 
 ### Jurnal QSO
 
-**Formularul QSO** conține grupul **Legătură**: Indicativ, Nume, Repetor, Frecvență MHz, Bandă, Mod, Locator, Propagare, plus un câmp de **Observații**. Toate detaliile despre formatare, auto-completare și validare sunt în secțiunea [Formularul QSO](#formularul-qso). În dreapta formularului, panoul **Vreme locală** — vezi [Vreme locală](#vreme-locală).
+**Formularul QSO** conține grupul **Legătură**: Indicativ, Nume, Repetor, Frecvență MHz, Bandă, Mod, Locator, Propagare, plus un câmp de **Observații**. Toate detaliile despre formatare, auto-completare și validare sunt în secțiunea [Formularul QSO](#formularul-qso). În dreapta formularului, panoul **Vreme locală** — vezi [Vreme locală](#vreme-locală) — iar în dreapta acestuia, panoul **Benzi și frecvențe** — vezi [Benzi și frecvențe](#benzi-și-frecvențe).
 
 **Acțiuni**: **Salvează QSO** (creează un QSO nou sau actualizează cel încărcat pentru editare — butonul nu își schimbă eticheta, comportamentul depinde de faptul că un QSO este sau nu încărcat), **QSO nou** (golește formularul; dacă erai în mijlocul unei editări, renunță la modificări fără să scrie în baza de date), **Editează** și **Șterge** (acționează asupra rândului selectat în tabel; dacă nu e nimic selectat, nu fac nimic). **Șterge** cere confirmare înainte de eliminarea definitivă.
 
@@ -161,6 +161,15 @@ Câmpul intern **locator propriu** (`my_grid_square`) este completat automat, la
 
 Lângă formular, panoul **Vreme locală** afișează temperatura, umiditatea și condițiile curente la poziția stației (latitudine/longitudine din profilul operatorului), preluate de la [Open-Meteo](https://open-meteo.com/) — public, fără cheie API. Presiunea atmosferică, viteza și direcția vântului provin din observația METAR a Aeroportului Internațional Sibiu (LRSB), preluată de la Aviation Weather Center; presiunea este afișată în hPa, viteza atât în noduri, cât și în km/h, iar direcția în grade și punct cardinal. Dacă observația METAR nu este disponibilă, presiunea și vântul apar ca `N/A`, fără a ascunde celelalte date meteo. Panoul se actualizează automat, o singură dată la scurt timp după deschiderea aplicației, apoi periodic la fiecare `local_weather_auto_refresh_minutes` (vezi [Setări vreme locală](#setări-vreme-locală)) minute; butonul **Actualizează** apare doar dacă actualizarea automată este dezactivată din setări. Dacă poziția stației nu e setată (Setări → Date operator), panoul arată acest lucru în loc să încerce o cerere fără sens. La fel ca panoul de propagare, orice eșec de rețea lasă ultimele valori afișate neschimbate, cu un mesaj de stare clar.
 
+### Benzi și frecvențe
+
+În dreapta panoului **Vreme locală**, panoul **Benzi și frecvențe (referință)** afișează două tabele statice pentru benzile 160m–70cm, unul lângă altul:
+
+* **Radioamator (NG)** — benzile alocate radioamatorilor (statut neguvernamental), cu intervalul de frecvență și tipul alocării (primară/secundară/bandă WARC).
+* **Alocare partajată / guvernamentală (informativ)** — pentru fiecare bandă, ce alt serviciu (fix, maritim mobil, guvernamental, radiolocație etc.) partajează sau are prioritate asupra ei conform Reglementărilor radio ITU; nu este o listă exhaustivă sau clasificată de sisteme militare specifice.
+
+Ambele tabele sunt date statice (planul de benzi IARU Regiunea 1, aceleași la fiecare pornire, nicio cerere de rețea) și sunt dimensionate să afișeze toate cele 14 rânduri fără scroll — de aceea fereastra principală are o dimensiune implicită și minimă generoasă. Verifică întotdeauna reglementarea ANCOM curentă înainte de a folosi aceste date pentru decizii de licențiere.
+
 ## Meniul Fișier
 
 Acțiunile care produc fișiere sunt grupate în **Fișier**: **Exportă Excel**, **Exportă ADIF**, **Creează backup** și **Ieșire**.
@@ -217,7 +226,7 @@ Pe laptopuri fără GPS, Windows poate estima poziția din Wi-Fi, rețea sau alt
   <img src="docs/screenshots/propagare.png" alt="Tab-ul Propagare" width="100%">
 </p>
 
-Fereastra principală poate conține un panou compact **Condiții de propagare**, nu o hartă — vizibil doar dacă `show_propagation_panel` din `config.json` este `"true"` (implicit). Fiecare valoare disponibilă arată unitatea, furnizorul și vechimea sa; o valoare fără observație verificabilă este **N/A**, niciodată zero. Modelul unificat reține valoarea, unitatea, sursa, momentul UTC, vechimea calculată, calitatea și starea. Tabelul de benzi calculează separat zi/noapte pentru 80, 40, 20, 15, 10 m, 2 m și 70 cm. Pentru benzile HF, scorul urmărește indicii solari (SFI/Kp/A) și diferă între zi și noapte; pentru 2 m/70 cm, fără propagare ionosferică relevantă, este o estimare orientativă fixă de tip line-of-sight, identică zi și noapte. Este o euristică locală, cu încredere scăzută/medie după acoperirea indicilor: **nu este VOACAP și nu este o predicție garantată**.
+Fereastra principală poate conține un panou compact **Condiții de propagare**, nu o hartă — vizibil doar dacă `show_propagation_panel` din `config.json` este `"true"` (implicit). Fiecare valoare disponibilă arată unitatea, furnizorul și vechimea sa; o valoare fără observație verificabilă este **N/A**, niciodată zero. Modelul unificat reține valoarea, unitatea, sursa, momentul UTC, vechimea calculată, calitatea și starea. Tabelul de benzi calculează separat zi/noapte pentru 160, 80, 40, 20, 15, 10 m, 2 m și 70 cm. Pentru benzile HF, scorul urmărește indicii solari (SFI/Kp/A) și diferă între zi și noapte; pentru 2 m/70 cm, fără propagare ionosferică relevantă, este o estimare orientativă fixă de tip line-of-sight, identică zi și noapte. Este o euristică locală, cu încredere scăzută/medie după acoperirea indicilor: **nu este VOACAP și nu este o predicție garantată**.
 
 Actualizarea se produce în trei situații: la apăsarea butonului **Actualizează**, automat (cu întârziere de 700 ms) când banda din formularul QSO se schimbă, și periodic — dacă panoul e activat, la fiecare `propagation_auto_refresh_minutes` (1/5/10/15/30/60) minute, doar dacă o bandă e curentă selectată în formular. Actualizarea din fundal se oprește automat la închiderea aplicației. Toate cererile HTTP rulează într-un fir separat, ca să nu blocheze interfața.
 
@@ -288,6 +297,7 @@ call_book/                           pachetul aplicației
   services/propagation_cache.py      cache local pentru datele meteo spațiale
   services/space_weather_service.py  clienți NOAA/SILSO/GFZ/NRCan/HamQSL
   services/local_weather_service.py  client Open-Meteo pentru vremea locală
+  services/band_plan.py              date statice: planul de benzi 160m–70cm
   ui/                                 interfața PySide6 / Qt for Python
 tests/                                teste unittest (vezi mai jos)
 docs/screenshots/                    capturile de ecran folosite în acest README

@@ -162,7 +162,7 @@ class PropagationEstimatorTests(TestCase):
 
     def test_hf_table_contains_all_compact_bands(self) -> None:
         conditions = PropagationEstimator().calculate_bands(self.weather, datetime.now(UTC))
-        self.assertEqual(tuple(conditions), ("80m", "40m", "20m", "15m", "10m", "2m", "70cm"))
+        self.assertEqual(tuple(conditions), ("160m", "80m", "40m", "20m", "15m", "10m", "2m", "70cm"))
         self.assertLess(conditions["80m"][0].score, conditions["80m"][1].score)
 
     def test_vhf_uhf_rows_use_the_flat_line_of_sight_estimate(self) -> None:
@@ -324,6 +324,7 @@ class PropagationEstimatorTests(TestCase):
 
     def test_frequency_ranges_are_available_for_propagation_bands(self) -> None:
         expected_ranges = {
+            "160m": "1.8–2 MHz",
             "80m": "3.5–4 MHz",
             "40m": "7–7.3 MHz",
             "20m": "14–14.35 MHz",

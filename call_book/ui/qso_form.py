@@ -22,6 +22,7 @@ from ..services.propagation_service import (
     suggest_propagation_mode,
 )
 from ..utils.text_formatters import format_callsign, format_grid_square, format_operator_name
+from .band_plan_panel import BandPlanPanel
 from .local_weather_panel import LocalWeatherPanel
 
 # Field values (callsigns, frequencies, band/mode names) are all short; a
@@ -129,10 +130,8 @@ class QSOForm(QGroupBox):
         self.weather_panel = LocalWeatherPanel(self.location_provider)
         self.weather_panel.setMaximumWidth(320)
         grid.addWidget(self.weather_panel, 0, len(FIELD_GROUPS))
-        # A trailing empty column absorbs leftover width instead of it being
-        # redistributed into "Legătură" once the weather panel's own cap
-        # stops it from claiming that space itself.
-        grid.setColumnStretch(len(FIELD_GROUPS) + 1, 1)
+        self.band_plan_panel = BandPlanPanel()
+        grid.addWidget(self.band_plan_panel, 0, len(FIELD_GROUPS) + 1)
 
         self.notes = QTextEdit()
         self.notes.setFixedHeight(72)

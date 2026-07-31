@@ -46,8 +46,11 @@ class MainWindow(QMainWindow):
         self.show_propagation_panel = self.app_config.get("show_propagation_panel", "true") == "true"
         self.propagation_panel = None
         self.setWindowTitle("Radio Logbook")
-        self.resize(1440, 900)
-        self.setMinimumSize(1024, 700)
+        # The "Benzi și frecvențe" reference tables in the QSO tab are sized
+        # to show every row without scrollbars, so the window needs enough
+        # room from the start to avoid clipping them (see BandPlanPanel).
+        self.resize(1900, 1050)
+        self.setMinimumSize(1850, 1000)
         self.setStyleSheet(DARK)
         self._menu()
         self._build()
