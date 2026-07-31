@@ -161,9 +161,17 @@ class PropagationEstimatorTests(TestCase):
         self.weather = SpaceWeatherData(2, 8, 150, None, None, "fixture", now, now)
 
     def test_hf_table_contains_all_compact_bands(self) -> None:
-        conditions = PropagationEstimator().calculate_hf(self.weather, datetime.now(UTC))
-        self.assertEqual(tuple(conditions), ("80m", "40m", "20m", "15m", "10m"))
+        conditions = PropagationEstimator().calculate_bands(self.weather, datetime.now(UTC))
+        self.assertEqual(tuple(conditions), ("80m", "40m", "20m", "15m", "10m", "2m", "70cm"))
         self.assertLess(conditions["80m"][0].score, conditions["80m"][1].score)
+
+    def test_vhf_uhf_rows_use_the_flat_line_of_sight_estimate(self) -> None:
+        # 2m/70cm aren't driven by solar indices, so day and night must match.
+        conditions = PropagationEstimator().calculate_bands(self.weather, datetime.now(UTC))
+        for band in ("2m", "70cm"):
+            day, night = conditions[band]
+            self.assertEqual(day.score, night.score)
+            self.assertIn("line-of-sight", " ".join(day.warnings).lower())
 
     def test_existing_vhf_warnings_are_preserved(self) -> None:
         condition = evaluate_band_conditions("6m", self.weather, datetime.now(UTC))
@@ -321,6 +329,8 @@ class PropagationEstimatorTests(TestCase):
             "20m": "14–14.35 MHz",
             "15m": "21–21.45 MHz",
             "10m": "28–29.7 MHz",
+            "2m": "144–148 MHz",
+            "70cm": "430–440 MHz",
         }
         for band, expected_range in expected_ranges.items():
             self.assertEqual(frequency_range_for_band(band), expected_range)
