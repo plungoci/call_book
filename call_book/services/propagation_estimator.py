@@ -6,7 +6,7 @@ from datetime import datetime
 
 from ..propagation_models import BandCondition, SpaceWeatherData
 
-HF_BANDS = ("80m", "40m", "20m", "15m", "10m")
+PANEL_BANDS = ("80m", "40m", "20m", "15m", "10m", "2m", "70cm")
 _ALL_HF_BANDS = {"160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m"}
 
 
@@ -70,14 +70,19 @@ def evaluate_band_conditions(
 
 
 class PropagationEstimator:
-    """Calculates compact HF day/night rows using the existing heuristic."""
+    """Calculates compact day/night rows for the panel's bands.
 
-    def calculate_hf(
+    HF bands use the space-weather heuristic in ``evaluate_band_conditions``;
+    2m/70cm fall through to its flat line-of-sight estimate, so their day and
+    night ratings are identical.
+    """
+
+    def calculate_bands(
         self, weather: SpaceWeatherData, timestamp_utc: datetime
     ) -> dict[str, tuple[BandCondition, BandCondition]]:
         day = timestamp_utc.replace(hour=12, minute=0, second=0, microsecond=0)
         night = timestamp_utc.replace(hour=0, minute=0, second=0, microsecond=0)
         return {
             band: (evaluate_band_conditions(band, weather, day), evaluate_band_conditions(band, weather, night))
-            for band in HF_BANDS
+            for band in PANEL_BANDS
         }

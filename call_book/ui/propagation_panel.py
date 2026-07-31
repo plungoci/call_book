@@ -79,9 +79,9 @@ class PropagationPanel(QGroupBox):
             label.setWordWrap(True)
             self.metrics.addWidget(label, i // 4, i % 4)
             self.metric_labels[name] = label
-        self.table = QTableWidget(5, 6)
+        self.table = QTableWidget(7, 6)
         self.table.setHorizontalHeaderLabels(("Bandă", "Interval frecvență", "Zi", "Noapte", "Scor", "Încredere"))
-        self.table.setVerticalHeaderLabels(("80m", "40m", "20m", "15m", "10m"))
+        self.table.setVerticalHeaderLabels(("80m", "40m", "20m", "15m", "10m", "2m", "70cm"))
         self.table.verticalHeader().setVisible(False)
         # Default column widths are too narrow for headers like "Interval
         # frecvență", clipping them; size each column to fit its header/cell
@@ -129,7 +129,7 @@ class PropagationPanel(QGroupBox):
         }
         for k, v in vals.items():
             self.metric_labels[k].setText(f"<b>{k}</b><br>{self._format_value(v)}")
-        for r, (band, (day, night)) in enumerate(self.estimator.calculate_hf(w, datetime.now(UTC)).items()):
+        for r, (band, (day, night)) in enumerate(self.estimator.calculate_bands(w, datetime.now(UTC)).items()):
             values = (
                 band,
                 frequency_range_for_band(band) or "N/A",
