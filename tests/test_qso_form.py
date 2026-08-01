@@ -184,6 +184,19 @@ class QSOFormTests(unittest.TestCase):
         self.assertEqual(self.form.weather_panel.wind_label.text(), "12 kt / 22.2 km/h")
         self.assertEqual(self.form.weather_panel.wind_direction_label.text(), "270° (V)")
 
+    def test_weather_panel_shows_variable_wind_direction_distinctly_from_unavailable(self):
+        self.form.weather_panel.update_values(
+            LocalWeatherData(
+                temperature_c=10,
+                humidity_percent=40,
+                condition="Cer senin",
+                wind_speed_knots=3,
+                wind_direction_degrees=None,
+                wind_direction_variable=True,
+            )
+        )
+        self.assertEqual(self.form.weather_panel.wind_direction_label.text(), "Variabilă")
+
     def test_shutdown_does_not_raise_without_an_active_worker(self):
         self.form.shutdown()
 

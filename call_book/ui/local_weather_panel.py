@@ -88,7 +88,7 @@ class LocalWeatherPanel(QGroupBox):
         self.wind_label.setText(
             f"{w.wind_speed_knots:.0f} kt / {w.wind_speed_kmh:.1f} km/h" if w.wind_speed_knots is not None else "N/A"
         )
-        self.wind_direction_label.setText(_format_wind_direction(w.wind_direction_degrees))
+        self.wind_direction_label.setText(_format_wind_direction(w.wind_direction_degrees, w.wind_direction_variable))
 
     def shutdown(self):
         if self._worker_thread is not None and self._worker_thread.isRunning():
@@ -96,7 +96,9 @@ class LocalWeatherPanel(QGroupBox):
             self._worker_thread.wait(1000)
 
 
-def _format_wind_direction(degrees):
+def _format_wind_direction(degrees, variable=False):
+    if variable:
+        return "Variabilă"
     if degrees is None:
         return "N/A"
     normalized = degrees % 360

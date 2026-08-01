@@ -79,6 +79,11 @@ class LocalWeatherData:
     atmospheric_pressure_hpa: float | None = None
     wind_speed_knots: float | None = None
     wind_direction_degrees: float | None = None
+    # METAR reports "VRB" instead of a heading when the wind direction is
+    # too variable to pin down (typically with light/gusty wind) — that's a
+    # real, meaningful reading, not a missing one, so it's tracked separately
+    # from wind_direction_degrees being None (genuinely unavailable).
+    wind_direction_variable: bool = False
 
     @property
     def wind_speed_kmh(self) -> float | None:
@@ -115,7 +120,9 @@ class LocalWeatherService:
         if not isinstance(current, dict):
             raise LocalWeatherError("Răspunsul nu conține date meteo curente.")
         code = _number(current.get("weather_code"))
-        pressure, wind_speed, wind_direction = self._fetch_sibiu_airport_observation(timeout_seconds)
+        pressure, wind_speed, wind_direction, wind_direction_variable = self._fetch_sibiu_airport_observation(
+            timeout_seconds
+        )
         return LocalWeatherData(
             temperature_c=_number(current.get("temperature_2m")),
             humidity_percent=_number(current.get("relative_humidity_2m")),
@@ -123,12 +130,13 @@ class LocalWeatherService:
             atmospheric_pressure_hpa=pressure,
             wind_speed_knots=wind_speed,
             wind_direction_degrees=wind_direction,
+            wind_direction_variable=wind_direction_variable,
         )
 
     def _fetch_sibiu_airport_observation(
         self,
         timeout_seconds: float,
-    ) -> tuple[float | None, float | None, float | None]:
+    ) -> tuple[float | None, float | None, float | None, bool]:
         """Return pressure and wind from Sibiu Airport's latest METAR.
 
         Reuses a recent fetch instead of hitting the network every time (see
@@ -150,26 +158,32 @@ class LocalWeatherService:
             reports = json.loads(response.content.decode("utf-8"))
         except (curl_requests.errors.RequestsError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             LOG.warning("Observația METAR pentru aeroportul Sibiu nu este disponibilă: %s", exc)
-            return self._read_metar_cache(_METAR_FALLBACK_MAX_AGE_SECONDS) or (None, None, None)
+            return self._read_metar_cache(_METAR_FALLBACK_MAX_AGE_SECONDS) or (None, None, None, False)
 
         if not isinstance(reports, list) or not reports or not isinstance(reports[0], dict):
-            return self._read_metar_cache(_METAR_FALLBACK_MAX_AGE_SECONDS) or (None, None, None)
+            return self._read_metar_cache(_METAR_FALLBACK_MAX_AGE_SECONDS) or (None, None, None, False)
         report = reports[0]
-        result = (_number(report.get("altim")), _number(report.get("wspd")), _number(report.get("wdir")))
+        raw_wind_direction = report.get("wdir")
+        # Aviation Weather Center reports "VRB" instead of a heading for a
+        # variable wind direction — a real reading, not a missing one, and
+        # not parseable as a number.
+        is_variable = isinstance(raw_wind_direction, str) and raw_wind_direction.strip().upper() == "VRB"
+        wind_direction = None if is_variable else _number(raw_wind_direction)
+        result = (_number(report.get("altim")), _number(report.get("wspd")), wind_direction, is_variable)
         self._write_metar_cache(result)
         return result
 
-    def _read_metar_cache(self, max_age_seconds: float) -> tuple[float | None, float | None, float | None] | None:
+    def _read_metar_cache(self, max_age_seconds: float) -> tuple[float | None, float | None, float | None, bool] | None:
         try:
             data = json.loads(self.metar_cache_path.read_text(encoding="utf-8"))
             if time.time() - data["fetched_at"] <= max_age_seconds:
-                return data["pressure"], data["wind_speed"], data["wind_direction"]
+                return data["pressure"], data["wind_speed"], data["wind_direction"], data.get("wind_variable", False)
         except (OSError, ValueError, KeyError, json.JSONDecodeError):
             pass
         return None
 
-    def _write_metar_cache(self, result: tuple[float | None, float | None, float | None]) -> None:
-        pressure, wind_speed, wind_direction = result
+    def _write_metar_cache(self, result: tuple[float | None, float | None, float | None, bool]) -> None:
+        pressure, wind_speed, wind_direction, wind_variable = result
         try:
             self.metar_cache_path.parent.mkdir(parents=True, exist_ok=True)
             cached = {
@@ -177,6 +191,7 @@ class LocalWeatherService:
                 "pressure": pressure,
                 "wind_speed": wind_speed,
                 "wind_direction": wind_direction,
+                "wind_variable": wind_variable,
             }
             self.metar_cache_path.write_text(json.dumps(cached), encoding="utf-8")
         except OSError:
