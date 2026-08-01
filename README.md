@@ -7,7 +7,7 @@ Aplicație desktop locală/offline pentru evidența legăturilor radioamatorice 
 
 ## Prezentare vizuală
 
-Imaginea de mai sus prezintă tab-ul **Jurnal QSO**: formularul de introducere a unui QSO, panoul **Vreme locală**, filtrele de căutare deschise și tabelul jurnalului. Restul capturilor din `docs/screenshots/` sunt plasate lângă secțiunile corespunzătoare din acest document (Locație, Setări, Propagare, Date operator, Repetoare).
+Imaginea de mai sus prezintă tab-ul **Jurnal QSO**: formularul de introducere a unui QSO, panoul **Vreme locală**, filtrele de căutare deschise și tabelul jurnalului. Restul capturilor din `docs/screenshots/` sunt plasate lângă secțiunile corespunzătoare din acest document (Locație, Propagare, Date operator, Repetoare).
 
 ## Funcționalități
 
@@ -75,7 +75,8 @@ Aplicația pornește maximizată. Antetul afișează titlul aplicației, locator
 - **Jurnal QSO** — jurnalul propriu-zis: filtre, formular și tabelul de legături.
 - **Propagare** — panoul de condiții de propagare (afișat doar dacă `show_propagation_panel` este activat în `config.json`; vezi [Panou condiții de propagare](#panou-condiții-de-propagare)).
 - **Locație** — rezumatul poziției stației, cu acces rapid la profilul operatorului.
-- **Setări** — aceleași acțiuni ca meniul **Setări**, disponibile și ca butoane.
+
+Toate acțiunile de configurare (profil operator, repetoare, setări propagare/vreme locală, resetare ID-uri) sunt disponibile din meniul **Setări**, nu dintr-un tab separat.
 
 ### Jurnal QSO
 
@@ -95,14 +96,6 @@ Afișează locatorul Maidenhead (sau cel implicit, dacă nu s-a completat unul p
 
 <p align="center">
   <img src="docs/screenshots/locatie.png" alt="Tab-ul Locație" width="80%">
-</p>
-
-### Setări
-
-Oferă aceleași acțiuni ca meniul **Setări**, ca listă de butoane: Date operator, Administrează repetoare, Setări propagare, Setări vreme locală, Creează backup, Resetează numerotarea ID-urilor.
-
-<p align="center">
-  <img src="docs/screenshots/setari.png" alt="Tab-ul Setări" width="80%">
 </p>
 
 ## Formularul QSO

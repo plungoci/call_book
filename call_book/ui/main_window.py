@@ -109,17 +109,14 @@ class MainWindow(QMainWindow):
         root.addWidget(self.tabs)
         self.log = QWidget()
         self.location = QWidget()
-        self.settings = QWidget()
         self.tabs.addTab(self.log, "Jurnal QSO")
         if self.show_propagation_panel:
             self.propagation_tab = QWidget()
             self.tabs.addTab(self.propagation_tab, "Propagare")
             self._propagation()
         self.tabs.addTab(self.location, "Locație")
-        self.tabs.addTab(self.settings, "Setări")
         self._log()
         self._location()
-        self._settings()
         self.status = QLabel("Gata pentru un QSO nou.")
         root.addWidget(self.status)
 
@@ -210,21 +207,6 @@ class MainWindow(QMainWindow):
         b = QPushButton("Deschide profilul operatorului")
         b.clicked.connect(self.open_operator_profile)
         layout.addWidget(b)
-        layout.addStretch()
-
-    def _settings(self):
-        layout = QVBoxLayout(self.settings)
-        for text, fn in [
-            ("Date operator", self.open_operator_profile),
-            ("Administrează repetoare", self.open_repeaters),
-            ("Setări propagare", self.open_propagation_settings),
-            ("Setări vreme locală", self.open_weather_settings),
-            ("Creează backup", self.backup),
-            ("Resetează numerotarea ID-urilor", self.reset_id_sequences),
-        ]:
-            b = QPushButton(text)
-            b.clicked.connect(fn)
-            layout.addWidget(b)
         layout.addStretch()
 
     def filters(self):
