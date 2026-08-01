@@ -147,6 +147,45 @@ class LocalWeatherServiceTests(TestCase):
         self.assertEqual(result.wind_speed_knots, 5)
         self.assertEqual(result.wind_direction_degrees, 180)
 
+    def test_variable_wind_direction_is_reported_as_variable_not_unavailable(self) -> None:
+        # Regression test: Aviation Weather Center reports "VRB" instead of a
+        # heading when the wind direction is too variable to pin down
+        # (typically light/gusty wind) — float("VRB") raised ValueError and
+        # was silently swallowed into None, indistinguishable from a genuine
+        # "no reading available" even though wind speed/pressure came through.
+        metar_payload = b'[{"icaoId": "LRSB", "altim": 1017.6, "wspd": 3, "wdir": "VRB"}]'
+        with (
+            TemporaryDirectory() as directory,
+            patch(
+                "call_book.services.local_weather_service.curl_requests.get",
+                side_effect=(FakeResponse(_WEATHER_PAYLOAD), FakeResponse(metar_payload)),
+            ),
+        ):
+            result = LocalWeatherService(Path(directory) / "metar.json").fetch(46.77, 23.6)
+        self.assertTrue(result.wind_direction_variable)
+        self.assertIsNone(result.wind_direction_degrees)
+        self.assertEqual(result.wind_speed_knots, 3)
+        self.assertEqual(result.atmospheric_pressure_hpa, 1017.6)
+
+    def test_variable_wind_direction_survives_the_metar_cache_round_trip(self) -> None:
+        metar_payload = b'[{"icaoId": "LRSB", "altim": 1017.6, "wspd": 3, "wdir": "VRB"}]'
+        with (
+            TemporaryDirectory() as directory,
+            patch(
+                "call_book.services.local_weather_service.curl_requests.get",
+                side_effect=(
+                    FakeResponse(_WEATHER_PAYLOAD),
+                    FakeResponse(metar_payload),
+                    FakeResponse(_WEATHER_PAYLOAD),
+                ),
+            ),
+        ):
+            service = LocalWeatherService(Path(directory) / "metar.json")
+            service.fetch(46.77, 23.6)
+            second = service.fetch(46.77, 23.6)  # served from cache, not a second METAR request
+        self.assertTrue(second.wind_direction_variable)
+        self.assertIsNone(second.wind_direction_degrees)
+
     def test_metar_cache_older_than_the_fallback_window_is_not_used(self) -> None:
         with TemporaryDirectory() as directory:
             cache_path = Path(directory) / "metar.json"
