@@ -9,13 +9,28 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from dataclasses import dataclass
+from pathlib import Path
 
 from curl_cffi import requests as curl_requests
 
 _ENDPOINT = "https://api.open-meteo.com/v1/forecast"
 _SIBIU_METAR_ENDPOINT = "https://aviationweather.gov/api/data/metar"
 _SIBIU_ICAO = "LRSB"
+_DEFAULT_METAR_CACHE_PATH = Path("cache/local_weather/sibiu_metar.json")
+# A routine METAR is only reissued roughly every 30-60 minutes, so re-fetching
+# it on every weather refresh (which can be configured as often as every
+# minute) gains nothing and risks the aviation-weather API rate-limiting or
+# blocking the repeated requests — the same kind of bot-management NOAA SWPC
+# applies to its own feeds (see space_weather_service). Reusing a recent
+# fetch avoids hitting that in the first place.
+_METAR_REFRESH_INTERVAL_SECONDS = 20 * 60
+# If a fresh fetch fails, fall back to a not-too-stale cached reading instead
+# of blanking out already-good data — the same "keep the last valid reading"
+# principle the propagation panel uses. Matches the 3-hour window already
+# requested from the API itself.
+_METAR_FALLBACK_MAX_AGE_SECONDS = 3 * 60 * 60
 
 LOG = logging.getLogger(__name__)
 
@@ -80,6 +95,9 @@ def _number(value: object) -> float | None:
 class LocalWeatherService:
     """Fetch current temperature/humidity/conditions from Open-Meteo."""
 
+    def __init__(self, metar_cache_path: Path | None = None) -> None:
+        self.metar_cache_path = metar_cache_path or _DEFAULT_METAR_CACHE_PATH
+
     def fetch(self, latitude: float, longitude: float, timeout_seconds: float = 10) -> LocalWeatherData:
         params = {
             "latitude": f"{latitude:.4f}",
@@ -107,11 +125,20 @@ class LocalWeatherService:
             wind_direction_degrees=wind_direction,
         )
 
-    @staticmethod
     def _fetch_sibiu_airport_observation(
+        self,
         timeout_seconds: float,
     ) -> tuple[float | None, float | None, float | None]:
-        """Return pressure and wind from Sibiu Airport's latest METAR."""
+        """Return pressure and wind from Sibiu Airport's latest METAR.
+
+        Reuses a recent fetch instead of hitting the network every time (see
+        _METAR_REFRESH_INTERVAL_SECONDS), and falls back to a still-reasonably
+        fresh cached reading if a live fetch fails, instead of blanking out
+        already-good data with N/A over a transient failure.
+        """
+        cached = self._read_metar_cache(_METAR_REFRESH_INTERVAL_SECONDS)
+        if cached is not None:
+            return cached
         try:
             response = curl_requests.get(
                 _SIBIU_METAR_ENDPOINT,
@@ -123,9 +150,34 @@ class LocalWeatherService:
             reports = json.loads(response.content.decode("utf-8"))
         except (curl_requests.errors.RequestsError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             LOG.warning("Observația METAR pentru aeroportul Sibiu nu este disponibilă: %s", exc)
-            return None, None, None
+            return self._read_metar_cache(_METAR_FALLBACK_MAX_AGE_SECONDS) or (None, None, None)
 
         if not isinstance(reports, list) or not reports or not isinstance(reports[0], dict):
-            return None, None, None
+            return self._read_metar_cache(_METAR_FALLBACK_MAX_AGE_SECONDS) or (None, None, None)
         report = reports[0]
-        return _number(report.get("altim")), _number(report.get("wspd")), _number(report.get("wdir"))
+        result = (_number(report.get("altim")), _number(report.get("wspd")), _number(report.get("wdir")))
+        self._write_metar_cache(result)
+        return result
+
+    def _read_metar_cache(self, max_age_seconds: float) -> tuple[float | None, float | None, float | None] | None:
+        try:
+            data = json.loads(self.metar_cache_path.read_text(encoding="utf-8"))
+            if time.time() - data["fetched_at"] <= max_age_seconds:
+                return data["pressure"], data["wind_speed"], data["wind_direction"]
+        except (OSError, ValueError, KeyError, json.JSONDecodeError):
+            pass
+        return None
+
+    def _write_metar_cache(self, result: tuple[float | None, float | None, float | None]) -> None:
+        pressure, wind_speed, wind_direction = result
+        try:
+            self.metar_cache_path.parent.mkdir(parents=True, exist_ok=True)
+            cached = {
+                "fetched_at": time.time(),
+                "pressure": pressure,
+                "wind_speed": wind_speed,
+                "wind_direction": wind_direction,
+            }
+            self.metar_cache_path.write_text(json.dumps(cached), encoding="utf-8")
+        except OSError:
+            LOG.warning("Cache-ul METAR pentru aeroportul Sibiu nu a putut fi scris.", exc_info=True)
