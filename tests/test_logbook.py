@@ -83,6 +83,23 @@ class LogbookTests(unittest.TestCase):
             db.delete_qso(ident)
             self.assertEqual(db.list_qsos(), [])
 
+    def test_duplicate_check_ignores_the_same_contact_on_an_earlier_day(self):
+        # A real repeat contact with the same station/frequency/mode on a
+        # later day is a separate QSO, not an accidental double-entry of the
+        # one just logged — only same-day matches should be flagged.
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Database(Path(tmp) / "test.db")
+            ident = db.save_qso(validate_qso(self.qso()))
+            with db.connect() as c:
+                c.execute("UPDATE qsos SET qso_start_utc=? WHERE id=?", ("2020-01-01T10:00:00+00:00", ident))
+            self.assertFalse(db.possible_duplicate(validate_qso(self.qso())))
+
+    def test_duplicate_check_still_flags_a_same_day_contact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Database(Path(tmp) / "test.db")
+            db.save_qso(validate_qso(self.qso()))
+            self.assertTrue(db.possible_duplicate(validate_qso(self.qso())))
+
     def test_list_qsos_orders_by_id_ascending(self):
         # Regression test: the table used to sort by qso_start_utc DESC
         # (newest first), which the log's ID column then also showed

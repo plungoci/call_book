@@ -184,13 +184,16 @@ CREATE TABLE IF NOT EXISTS operator_profile (
             return c.execute(sql, values).fetchall()
 
     def possible_duplicate(self, q: QSO) -> bool:
-        # No per-QSO time is tracked anymore, so duplicates are now matched on
-        # callsign/frequency/mode alone rather than within a time window.
-        sql = "SELECT 1 FROM qsos WHERE callsign=? AND frequency_mhz=? AND mode=?" + (" AND id != ?" if q.id else "")
+        # Only flags a duplicate within the same UTC calendar day: working the
+        # same station again on a later day is a normal, separate QSO, not an
+        # accidental double-entry of the one just logged.
+        today = datetime.now(UTC).date().isoformat()
+        sql = "SELECT 1 FROM qsos WHERE callsign=? AND frequency_mhz=? AND mode=? AND substr(qso_start_utc,1,10)=?" + (
+            " AND id != ?" if q.id else ""
+        )
+        values = [q.callsign, q.frequency_mhz, q.mode, today] + ([q.id] if q.id else [])
         with self.connect() as c:
-            return (
-                c.execute(sql, [q.callsign, q.frequency_mhz, q.mode] + ([q.id] if q.id else [])).fetchone() is not None
-            )
+            return c.execute(sql, values).fetchone() is not None
 
     def delete_qso(self, id: int):
         with self.connect() as c:

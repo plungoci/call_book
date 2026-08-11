@@ -13,7 +13,7 @@ Imaginea de mai sus prezintă tab-ul **Jurnal QSO**: formularul de introducere a
 
 - **Jurnal QSO**: adăugare, editare, ștergere și listare a legăturilor, cu filtrare după indicativ, bandă, mod, ID repetor și interval de date.
 - **Formular QSO inteligent**: formatare automată a indicativului și numelui pe măsură ce tastezi, detectare automată a benzii din frecvență, auto-completare frecvență/mod la alegerea unui repetor și **sugestie automată a modului de propagare** pe baza benzii/modului/repetorului selectat.
-- **Detectare duplicate**: la salvare, aplicația avertizează dacă mai există un QSO cu același indicativ, frecvență și mod.
+- **Detectare duplicate**: la salvare, aplicația avertizează dacă mai există deja, **în aceeași zi UTC**, un QSO cu același indicativ, frecvență și mod — o legătură reală cu aceeași stație într-o altă zi nu este considerată duplicat.
 - **Repetoare administrabile**: listă proprie de repetoare (frecvențe, shift, CTCSS, locație), cu păstrarea QSO-urilor istorice la ștergerea unui repetor (`repeater_id` devine `NULL`).
 - **Profil operator persistent** în SQLite (nu în `config.json`): date personale, echipament, antenă, putere implicită, club, observații și localizare (Maidenhead + coordonate).
 - **Localizare automată**: detectare poziție prin Windows Location API (pe Windows) sau printr-un fallback HTTPS de geolocalizare IP, cu recalcularea locatorului Maidenhead.
@@ -146,7 +146,7 @@ O alegere manuală e protejată: odată selectat manual un mod de propagare, sch
 - Modul este obligatoriu.
 - Modul de propagare trebuie să fie una dintre valorile din listă.
 - Locatorul Maidenhead, dacă e completat, trebuie să respecte formatul valid.
-- Dacă un QSO cu același indicativ, frecvență și mod există deja, aplicația cere confirmare înainte de a salva un posibil duplicat.
+- Dacă un QSO cu același indicativ, frecvență și mod există deja **în aceeași zi UTC**, aplicația cere confirmare înainte de a salva un posibil duplicat; o legătură cu aceeași stație într-o zi diferită nu declanșează avertismentul.
 
 Câmpul intern **locator propriu** (`my_grid_square`) este completat automat, la crearea unui QSO nou, cu locatorul curent din profilul operatorului, pentru acuratețe istorică — nu se schimbă retroactiv dacă profilul e actualizat ulterior.
 
