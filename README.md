@@ -121,6 +121,20 @@ Nu porni direct `python main.py`: `main.py` rămâne punctul de intrare PySide6,
 
 Pentru actualizare automată, Git trebuie să fie instalat, iar proiectul trebuie obținut cu `git clone`, nu descărcat ca arhivă ZIP. Dacă nu există conexiune sau verificarea actualizărilor eșuează, aplicația pornește în continuare cu versiunea locală. Modificările locale nu sunt șterse, puse în stash sau suprascrise automat; o actualizare care nu poate fi aplicată fast-forward este anulată.
 
+### Când actualizarea este anulată
+
+Lansatorul spune care este cauza concretă, pentru că fiecare are altă rezolvare:
+
+| Mesaj | Ce înseamnă | Ce faci |
+|---|---|---|
+| `Actualizarea a fost anulată ca să nu pierzi modificările locale din: …` | ai modificat fișiere urmărite de Git în directorul de instalare, iar versiunea nouă le schimbă și ea | `git restore .` dacă modificările nu-ți trebuie, sau `git stash` ca să le păstrezi deoparte |
+| `…fișierele … există local, dar nu sunt urmărite de Git…` | ai creat fișiere cu același nume ca unele adăugate în versiunea nouă | mută-le sau șterge-le |
+| `Ai commituri locale care nu există pe origin…` | versiunea ta locală e mai nouă decât cea publicată | nimic — sau publică-le, dacă asta vrei |
+| `Istoricul local și cel de pe origin au divergat…` | ramura remote a fost rescrisă, sau ai commituri proprii peste care nu se poate face fast-forward | `git status` și decizi: `git reset --hard origin/<ramura>` renunță la istoricul local |
+| `Actualizarea a fost anulată. Git a raportat: …` | orice altceva (rețea, permisiuni) | textul citat este eroarea exactă a lui Git |
+
+Fișierele generate în timpul rulării (`config.json`, `data/*.db`, `radio_logbook.log`, `cache/`, exporturile și backup-urile) sunt în `.gitignore`, deci folosirea normală a aplicației nu blochează niciodată o actualizare.
+
 
 ## Fereastra principală
 

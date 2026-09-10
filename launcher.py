@@ -93,6 +93,66 @@ def _remote_is_newer(project_dir: Path, local_commit: str, remote_commit: str) -
     return result is not None and result.returncode == 0
 
 
+def _blocked_paths(stderr: str) -> list[str]:
+    """Extrage fișierele enumerate de Git sub un mesaj „would be overwritten”.
+
+    Git le listează pe câte un rând indentat cu tab, după linia de eroare.
+    """
+    paths = []
+    listing = False
+    for line in stderr.splitlines():
+        if "would be overwritten" in line:
+            listing = True
+            continue
+        if listing:
+            if line.startswith(("\t", "    ")) and line.strip():
+                paths.append(line.strip())
+            elif line.strip():
+                break
+    return paths
+
+
+def describe_pull_failure(stderr: str) -> str:
+    """Explică de ce a eșuat actualizarea și ce are de făcut utilizatorul.
+
+    Cauza obișnuită nu este un istoric divergent — verificarea fast-forward a
+    trecut deja când se ajunge aici — ci fișiere modificate local, pe care Git
+    refuză (pe bună dreptate) să le suprascrie. Mesajul spune care sunt.
+    """
+    paths = _blocked_paths(stderr)
+    if paths and "untracked working tree files" in stderr:
+        listed = ", ".join(paths)
+        return (
+            f"Actualizarea a fost anulată: fișierele {listed} există local, dar nu sunt urmărite de Git, "
+            "iar versiunea nouă le conține. Mută-le sau șterge-le, apoi pornește din nou aplicația."
+        )
+    if paths:
+        listed = ", ".join(paths)
+        return (
+            f"Actualizarea a fost anulată ca să nu pierzi modificările locale din: {listed}. "
+            "Rulează `git restore .` dacă nu ai nevoie de ele, sau `git stash` ca să le păstrezi deoparte, "
+            "apoi pornește din nou aplicația."
+        )
+    details = " ".join(line for line in stderr.splitlines() if line.strip())
+    if details:
+        return f"Actualizarea a fost anulată. Git a raportat: {details}"
+    return "Actualizarea a fost anulată, fără un motiv raportat de Git."
+
+
+def describe_divergence(project_dir: Path, local_commit: str, remote_commit: str) -> str:
+    """Spune de ce ramura locală nu poate avansa fast-forward la cea remote."""
+    result = run_git_command(["merge-base", "--is-ancestor", remote_commit, local_commit], project_dir)
+    if result is not None and result.returncode == 0:
+        return (
+            "Ai commituri locale care nu există pe origin, deci versiunea locală este mai nouă. "
+            "Actualizarea a fost anulată."
+        )
+    return (
+        "Istoricul local și cel de pe origin au divergat (ramura remote a fost rescrisă, "
+        "sau ai commituri proprii). Actualizarea a fost anulată."
+    )
+
+
 def check_for_updates(project_dir: Path) -> bool:
     """Verifică și aplică doar actualizările Git care pot fi fast-forward.
 
@@ -124,13 +184,16 @@ def check_for_updates(project_dir: Path) -> bool:
         print("Aplicația este deja actualizată.")
         return False
     if not _remote_is_newer(project_dir, local_commit, remote_commit):
-        print("Există modificări locale sau istoricul Git este divergent. Actualizarea a fost anulată.")
+        print(describe_divergence(project_dir, local_commit, remote_commit))
         return False
 
     print("A fost găsită o versiune nouă.")
     pull_result = run_git_command(["pull", "--ff-only", "origin", branch], project_dir, GIT_NETWORK_TIMEOUT)
-    if pull_result is None or pull_result.returncode != 0:
-        print("Există modificări locale sau istoricul Git este divergent. Actualizarea a fost anulată.")
+    if pull_result is None:
+        print("Comanda Git de actualizare nu a putut fi rulată sau a expirat. Pornesc versiunea locală.")
+        return False
+    if pull_result.returncode != 0:
+        print(describe_pull_failure(pull_result.stderr))
         return False
 
     new_commit = get_current_commit(project_dir)
