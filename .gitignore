@@ -8,6 +8,7 @@ backups/*.db
 backups/*.json
 radio_logbook.log
 config.json
+cache/
 *.egg-info/
 .mypy_cache/
 .ruff_cache/
