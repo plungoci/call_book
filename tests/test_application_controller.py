@@ -31,6 +31,18 @@ class ApplicationControllerTests(TestCase):
             with self.assertRaises(DuplicateQsoCancelled):
                 controller.save_qso(self._qso(), lambda _: False)
 
+    def test_transfer_backup_moves_a_logbook_to_another_device(self) -> None:
+        with TemporaryDirectory() as directory:
+            source = LogbookController(Database(Path(directory) / "source.db"))
+            source.save_qso(self._qso(), lambda _: True)
+            archive = source.export_transfer_backup(Path(directory) / "backup.json")
+
+            target = LogbookController(Database(Path(directory) / "target.db"))
+            summary = target.import_transfer_backup(target.load_transfer_backup(archive))
+
+            self.assertEqual(summary.imported_qsos, 1)
+            self.assertEqual(target.list_qsos({})[0].callsign, "YO3ABC")
+
     def test_config_write_round_trip_keeps_known_defaults(self) -> None:
         with TemporaryDirectory() as directory:
             path = Path(directory) / "config.json"

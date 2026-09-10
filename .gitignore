@@ -5,6 +5,7 @@ data/*.db
 exports/*.xlsx
 exports/*.adi
 backups/*.db
+backups/*.json
 radio_logbook.log
 config.json
 *.egg-info/

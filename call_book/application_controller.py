@@ -10,6 +10,7 @@ from .backup import create_backup
 from .database import Database
 from .excel_export import export_excel
 from .models import QSO
+from .transfer import ImportSummary, LogbookBackup, export_backup, import_backup, load_backup
 from .validators import validate_qso
 
 
@@ -39,6 +40,17 @@ class LogbookController:
 
     def create_backup(self) -> Path:
         return create_backup(self.database.path)
+
+    def export_transfer_backup(self, destination: Path) -> Path:
+        """Write the portable JSON backup used to move the logbook between devices."""
+        return export_backup(self.database, destination=destination)
+
+    def load_transfer_backup(self, source: Path) -> LogbookBackup:
+        """Read and validate a backup file before anything is written to the database."""
+        return load_backup(source)
+
+    def import_transfer_backup(self, backup: LogbookBackup) -> ImportSummary:
+        return import_backup(self.database, backup)
 
 
 class DuplicateQsoCancelled(Exception):

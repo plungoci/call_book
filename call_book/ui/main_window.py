@@ -9,6 +9,7 @@ from PySide6.QtWidgets import *
 
 from ..application_controller import DuplicateQsoCancelled, LogbookController
 from ..config import REFRESH_INTERVAL_OPTIONS, REFRESH_INTERVALS, save_config
+from ..transfer import BackupFormatError, default_backup_name, describe_import
 from .operator_profile_window import OperatorProfileWindow
 from .propagation_panel import PropagationPanel
 from .qso_form import QSOForm
@@ -79,6 +80,8 @@ class MainWindow(QMainWindow):
             ("Exportă Excel", self.excel),
             ("Exportă ADIF", self.adif),
             ("Creează backup", self.backup),
+            ("Exportă backup complet", self.export_transfer_backup),
+            ("Importă backup complet", self.import_transfer_backup),
             ("Ieșire", self.close),
         ]:
             action = QAction(title, self)
@@ -408,6 +411,55 @@ class MainWindow(QMainWindow):
             self.status.setText(f"Backup creat: {self.controller.create_backup()}")
         except Exception as e:
             QMessageBox.critical(self, "Eroare backup", str(e))
+
+    def export_transfer_backup(self):
+        """Write a portable copy of the whole logbook, for import on another device."""
+        suggested = str(Path("backups") / default_backup_name())
+        name, _ = QFileDialog.getSaveFileName(
+            self, "Exportă backup complet", suggested, "Backup Radio Logbook (*.json)"
+        )
+        if not name:
+            return
+        try:
+            path = self.controller.export_transfer_backup(Path(name))
+        except OSError as e:
+            QMessageBox.critical(self, "Eroare export backup", str(e))
+            return
+        self.status.setText(f"Backup complet creat: {path}")
+
+    def import_transfer_backup(self):
+        """Merge a backup exported on another device into this logbook."""
+        name, _ = QFileDialog.getOpenFileName(
+            self, "Importă backup complet", "backups", "Backup Radio Logbook (*.json)"
+        )
+        if not name:
+            return
+        try:
+            backup = self.controller.load_transfer_backup(Path(name))
+        except (BackupFormatError, OSError) as e:
+            QMessageBox.critical(self, "Eroare import backup", str(e))
+            return
+        question = (
+            f"Backup din {backup.exported_at_label}: "
+            f"{len(backup.qsos)} QSO-uri și {len(backup.repeaters)} repetoare.\n\n"
+            "Înregistrările care lipsesc vor fi adăugate în jurnalul curent, "
+            "iar cele existente rămân neschimbate. Continuați?"
+        )
+        if QMessageBox.question(self, "Confirmare import", question) != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            summary = self.controller.import_transfer_backup(backup)
+        except (ValueError, OSError, KeyError) as e:
+            QMessageBox.critical(self, "Eroare import backup", str(e))
+            return
+        self.operator_profile = self.db.get_operator_profile()
+        self._update_station_locator()
+        self.form.refresh_repeaters()
+        self.refresh()
+        QMessageBox.information(self, "Import finalizat", describe_import(summary))
+        self.status.setText(
+            f"Import finalizat: {summary.imported_qsos} QSO-uri adăugate, {summary.skipped_qsos} deja existente."
+        )
 
     def reset_id_sequences(self):
         message = (
