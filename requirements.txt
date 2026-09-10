@@ -1,3 +1,13 @@
+# Dependențele de rulare ale aplicației, instalate de scripturile din `scripts/`
+# și reinstalate de `launcher.py` după fiecare actualizare a acestui fișier.
+# Aceleași versiuni sunt declarate și în `pyproject.toml`.
+
+# Interfața grafică: PySide6.QtWidgets, PySide6.QtCore, PySide6.QtGui.
 PySide6>=6.7,<7
+
+# Exportul jurnalului în format Excel (.xlsx).
 openpyxl>=3.1,<4
+
+# Cereri HTTP către serviciile de propagare, spațiu și meteo, cu amprentă TLS
+# de browser (unele servicii refuză clienții HTTP obișnuiți).
 curl_cffi>=0.7

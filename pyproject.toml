@@ -9,9 +9,19 @@ description = "Local/offline amateur-radio QSO logbook (PySide6 + SQLite)."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    # Interfața grafică (QtWidgets, QtCore, QtGui).
     "PySide6>=6.7,<7",
+    # Export Excel (.xlsx).
     "openpyxl>=3.1,<4",
+    # Cereri HTTP cu amprentă TLS de browser către serviciile de propagare și meteo.
     "curl_cffi>=0.7",
+]
+
+[project.optional-dependencies]
+# Uneltele rulate local și de CI; aceleași versiuni ca în requirements-dev.txt.
+dev = [
+    "ruff>=0.6",
+    "mypy>=1.11",
 ]
 
 [tool.setuptools.packages.find]

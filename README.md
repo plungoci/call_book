@@ -88,13 +88,19 @@ Linux/macOS:
 source .venv/bin/activate
 ```
 
-Instalează dependențele:
+Instalează dependențele de rulare — `PySide6` (interfața grafică), `openpyxl` (export Excel) și `curl_cffi` (cereri HTTP către serviciile de propagare și meteo):
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-(Pentru dezvoltare — pachetul `call_book`, `ruff` și `mypy` — poți folosi alternativ `python -m pip install -e .`; `pyproject.toml` declară aceleași dependențe de rulare.)
+Pentru dezvoltare, instalează în plus uneltele de verificare folosite de CI (`ruff`, `mypy`):
+
+```bash
+python -m pip install -r requirements-dev.txt
+```
+
+(Alternativ, `python -m pip install -e ".[dev]"` instalează aceleași pachete și, în plus, pachetul `call_book` în modul editabil; `pyproject.toml` declară aceleași versiuni ca fișierele `requirements`.)
 
 La prima pornire se creează `data/logbook.db` și `config.json`. Datele personale ale operatorului sunt stocate separat, în tabelul SQLite `operator_profile`, astfel încât nu sunt pierdute la actualizările aplicației.
 
@@ -334,6 +340,7 @@ scripts/install.ps1                  instalare completă cu o comandă, pe Windo
 scripts/install.sh                   instalare completă cu o comandă, pe Linux/macOS
 pyproject.toml                       pachet, configurare ruff și mypy
 requirements.txt                     dependențe de rulare (folosit și de launcher.py)
+requirements-dev.txt                 dependențe de rulare + unelte de verificare (ruff, mypy)
 .github/workflows/ci.yml             CI: ruff, mypy și teste, headless
 call_book/                           pachetul aplicației
   models.py                          modele de date (QSO, Repeater, OperatorProfile), QSO.from_row()
