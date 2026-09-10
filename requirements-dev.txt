@@ -1,0 +1,15 @@
+# Dependențele de dezvoltare: tot ce este necesar pentru rulare, plus uneltele
+# de verificare folosite local și în `.github/workflows/ci.yml`.
+#
+#   python -m pip install -r requirements-dev.txt
+#
+# Echivalent cu `python -m pip install -e ".[dev]"`, care instalează în plus
+# pachetul `call_book` în modul editabil.
+
+-r requirements.txt
+
+# Linter și formatare (`ruff check .`, `ruff format --check .`).
+ruff>=0.6
+
+# Verificare statică de tipuri (`python -m mypy call_book main.py launcher.py tests`).
+mypy>=1.11
