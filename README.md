@@ -20,6 +20,7 @@ Imaginea de mai sus prezintă tab-ul **Jurnal QSO**: formularul de introducere a
 - **Export Excel (`.xlsx`)** cu antet aldin, filtru automat, rând înghețat și lățimi de coloană ajustate.
 - **Export ADIF** cu lungimi de câmp calculate exact în octeți (suport diacritice).
 - **Backup SQLite online** (API `sqlite3.backup()`), fără să blocheze aplicația.
+- **Export/import backup complet (transfer între dispozitive)**: un fișier `.json` portabil cu QSO-urile, repetoarele și profilul operatorului, care se importă pe alt calculator prin **îmbinare** — se adaugă doar ce lipsește, fără să șteargă sau să dubleze ce există deja.
 - **Panou „Condiții de propagare”**: indici meteo spațiali (Kp, SFI, SSN, raze X, vânt solar etc.) de la NOAA/SILSO/GFZ/NRCan/HamQSL și o estimare orientativă zi/noapte pentru benzile HF, cu actualizare automată configurabilă.
 - **Vreme locală**: temperatură, umiditate și condiții curente la poziția stației (Open-Meteo, fără cheie API), plus presiunea atmosferică și vântul de la Aeroportul Internațional Sibiu, afișate direct lângă formularul QSO.
 - **Resetare numerotare ID-uri** pentru QSO-uri, repetoare și stații, fără pierderea datelor.
@@ -165,7 +166,7 @@ Datele sunt statice (tabelul ANCOM pentru radioamatori, aceleași la fiecare por
 
 ## Meniul Fișier
 
-Acțiunile care produc fișiere sunt grupate în **Fișier**: **Exportă Excel**, **Exportă ADIF**, **Creează backup** și **Ieșire**.
+Acțiunile care produc fișiere sunt grupate în **Fișier**: **Exportă Excel**, **Exportă ADIF**, **Creează backup**, **Exportă backup complet**, **Importă backup complet** și **Ieșire**.
 
 ### Export Excel
 
@@ -178,6 +179,22 @@ Fiecare QSO devine o înregistrare ADIF cu lungimi de câmp calculate exact în 
 ### Backup
 
 Folosește API-ul nativ `sqlite3.backup()` pentru o copie online, consistentă, a bazei de date, fără să blocheze aplicația. Fișierul rezultat e numit `logbook_AAAALLZZ_HHMMSS.db` și salvat în `backups/`.
+
+### Export și import backup complet (transfer între dispozitive)
+
+Backup-ul `.db` de mai sus este o copie a bazei de date a unui singur calculator: restaurarea lui înseamnă înlocuirea completă a jurnalului. Pentru mutarea datelor între dispozitive — de exemplu un jurnal ținut pe laptop, adus pe calculatorul principal — există **backup-ul complet**, un fișier `.json` lizibil, independent de dispozitiv.
+
+**Exportă backup complet** scrie într-un singur fișier toate QSO-urile (cu momentul exact în care au fost înregistrate), toate repetoarele și profilul operatorului. Numele implicit este `call_book_backup_AAAALLZZ_HHMMSS.json`, propus în `backups/`.
+
+**Importă backup complet** citește și validează întâi fișierul (dacă nu este un backup valid, nimic nu se scrie în baza de date), afișează câte QSO-uri și repetoare conține și cere confirmare. La confirmare, datele sunt **îmbinate** în jurnalul curent:
+
+- **QSO-uri** — se adaugă doar cele care lipsesc, identificate după indicativ, frecvență, mod și momentul înregistrării; un QSO deja prezent este ignorat, nu duplicat. QSO-urile importate își păstrează data și ora originale, nu momentul importului.
+- **Repetoare** — sunt identificate după nume (indiferent de majuscule) și frecvența de ieșire, nu după ID: dacă repetorul există deja local, QSO-urile importate sunt legate de cel local; dacă nu, este adăugat. Un QSO al cărui repetor lipsește din fișier se importă oricum, fără legătura către repetor.
+- **Profilul operatorului** — este importat doar dacă jurnalul curent nu are unul (fără indicativ și fără nume); altfel, profilul dispozitivului curent rămâne neschimbat.
+
+La final, o fereastră arată exact ce s-a întâmplat: câte QSO-uri au fost importate, câte au fost ignorate ca existente, câte repetoare au fost adăugate sau refolosite și dacă profilul a fost importat. Importul aceluiași fișier de două ori nu adaugă nimic a doua oară, deci operațiunea poate fi repetată fără riscul duplicatelor.
+
+Fișierul conține toate datele pe care aplicația le folosește pentru un QSO (indicativ, frecvență, bandă, mod, repetor, nume, locatoare, propagare, note, marcaje de timp); ID-urile numerice nu sunt transferate, pentru că sunt locale fiecărui dispozitiv — la import se atribuie ID-uri noi, în continuarea celor existente.
 
 ## Meniul Setări
 
@@ -255,7 +272,7 @@ Fișierul mai reține și câteva chei suplimentare (`user_callsign`, `operator_
 
 - `data/logbook.db` — baza de date SQLite (QSO-uri, repetoare, stații, profil operator).
 - `exports/` — fișierele `.xlsx`/`.adi` generate.
-- `backups/` — copiile de siguranță `.db`.
+- `backups/` — copiile de siguranță `.db` și backup-urile complete `.json` pentru transfer între dispozitive.
 - `cache/space_weather/latest.json` — cache local pentru datele de propagare (valabil 15 minute).
 - `cache/local_weather/sibiu_metar.json` — cache local pentru observația METAR Sibiu (vezi [Vreme locală](#vreme-locală)).
 - `config.json` — configurația locală descrisă mai sus.
@@ -279,6 +296,7 @@ call_book/                           pachetul aplicației
   adif_export.py                     export ADIF
   excel_export.py                    export Excel
   backup.py                          backup SQLite online
+  transfer.py                        backup complet portabil (export/import JSON, îmbinare la import)
   config.py                          configurare JSON
   propagation.py                     vocabular de propagare și mapare ADIF
   propagation_models.py              modele imuabile pentru date meteo spațiale

@@ -155,6 +155,35 @@ CREATE TABLE IF NOT EXISTS operator_profile (
             )
             return cur.lastrowid
 
+    def import_qso(self, qso: QSO, qso_start_utc: str) -> int:
+        """Insert a QSO coming from a transfer backup, keeping its own timestamps.
+
+        Unlike :meth:`save_qso` this never stamps the current time: an imported
+        QSO must keep the moment it was logged on the other device, otherwise
+        the merged logbook would show every imported record as logged today.
+        """
+        fields = (
+            "callsign,frequency_mhz,band,mode,repeater_id,operator_name,grid_square,my_grid_square,notes,"
+            "propagation_mode,propagation_notes,created_at,updated_at"
+        )
+        values = [getattr(qso, name) for name in fields.split(",")]
+        with self.connect() as c:
+            return c.execute(
+                f"INSERT INTO qsos ({fields},qso_start_utc) VALUES ({','.join('?' * (len(values) + 1))})",
+                values + [qso_start_utc],
+            ).lastrowid
+
+    def qso_exists(self, callsign: str, frequency_mhz: float, mode: str, qso_start_utc: str) -> bool:
+        """Exact-match lookup used by imports, so re-importing a file adds nothing."""
+        with self.connect() as c:
+            return (
+                c.execute(
+                    "SELECT 1 FROM qsos WHERE callsign=? AND frequency_mhz=? AND mode=? AND qso_start_utc=?",
+                    (callsign, frequency_mhz, mode, qso_start_utc),
+                ).fetchone()
+                is not None
+            )
+
     def get_qso(self, id: int) -> QSO:
         return QSO.from_row(self._one("SELECT * FROM qsos WHERE id=?", (id,)))
 
@@ -211,6 +240,15 @@ CREATE TABLE IF NOT EXISTS operator_profile (
             return c.execute(
                 "SELECT * FROM repeaters WHERE name LIKE ? OR location LIKE ? ORDER BY name", (f"%{term}%", f"%{term}%")
             ).fetchall()
+
+    def find_repeater_id(self, name: str, output_frequency_mhz: float) -> int | None:
+        """Identify a repeater by its name and output frequency, not by its local id."""
+        with self.connect() as c:
+            row = c.execute(
+                "SELECT id FROM repeaters WHERE name=? COLLATE NOCASE AND output_frequency_mhz=?",
+                (name, output_frequency_mhz),
+            ).fetchone()
+        return row["id"] if row else None
 
     def save_repeater(self, r: Repeater) -> int:
         names = "name,output_frequency_mhz,input_frequency_mhz,shift_mhz,tone_hz,mode,location,grid_square,notes"
