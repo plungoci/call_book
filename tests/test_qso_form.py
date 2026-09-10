@@ -10,7 +10,7 @@ from typing import Any
 from unittest.mock import patch
 
 try:
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QScrollArea
 except ModuleNotFoundError:
     # Headless CI without PySide6 installed: the class-level skipUnless below
     # disables every test in this module instead of failing at import time.
@@ -440,6 +440,85 @@ class QSOFormTests(unittest.TestCase):
             self.assertEqual(window.weather_auto_refresh_timer.interval(), 60 * 60 * 1000)
 
             window.close()
+
+
+@unittest.skipUnless(QApplication is not None, "PySide6 is required for Qt UI tests")
+class ResponsiveLayoutTests(unittest.TestCase):
+    """The form must follow the width it is given, not demand its own."""
+
+    app: Any = None
+
+    @classmethod
+    def setUpClass(cls):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self):
+        # The form is exercised inside a QScrollArea because that is how
+        # MainWindow shows it: the scroll area is what hands the form its
+        # width, and re-flowing on a shrink takes a second layout pass that
+        # only happens with a real parent.
+        self.form = QSOForm(lambda: [])
+        self.addCleanup(self.form.shutdown)
+        self.scroll = QScrollArea()
+        self.scroll.setWidget(self.form)
+        self.scroll.setWidgetResizable(True)
+        self.scroll.show()
+        self.addCleanup(self.scroll.hide)
+
+    def _mode_at(self, width):
+        self.scroll.resize(width, 700)
+        for _ in range(4):
+            self.app.processEvents()
+        return self.form.layout_mode
+
+    def test_a_wide_window_keeps_the_three_panels_side_by_side(self):
+        self.assertEqual(self._mode_at(1600), "wide")
+
+    def test_a_medium_window_drops_the_band_plan_to_its_own_row(self):
+        self.assertEqual(self._mode_at(1000), "medium")
+
+    def test_a_narrow_window_stacks_everything_in_one_column(self):
+        self.assertEqual(self._mode_at(700), "narrow")
+
+    def test_the_layout_follows_the_window_back_up(self):
+        self._mode_at(700)
+        self.assertEqual(self._mode_at(1600), "wide")
+
+    def test_the_form_fits_a_small_laptop_screen(self):
+        # A 1366x768 display, minus the window frame and the other panels:
+        # the form must never be the reason the window cannot shrink.
+        self._mode_at(700)
+        self.assertLessEqual(self.form.minimumSizeHint().width(), 700)
+
+    def test_shrinking_needs_no_horizontal_scrollbar(self):
+        for width in (1600, 1000, 700):
+            self._mode_at(width)
+            self.assertFalse(self.scroll.horizontalScrollBar().isVisible(), width)
+
+    def test_every_panel_stays_visible_in_each_mode(self):
+        for width in (1600, 1000, 700):
+            self._mode_at(width)
+            for panel in (self.form.fields_box, self.form.weather_panel, self.form.band_plan_panel):
+                self.assertIsNotNone(self.form.grid.indexOf(panel) >= 0, width)
+                self.assertFalse(panel.isHidden(), width)
+
+
+@unittest.skipUnless(QApplication is not None, "PySide6 is required for Qt UI tests")
+class BandPlanHighlightTests(unittest.TestCase):
+    app: Any = None
+
+    @classmethod
+    def setUpClass(cls):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_typing_a_frequency_highlights_its_band_segment(self):
+        form = QSOForm(lambda: [])
+        self.addCleanup(form.shutdown)
+        form.set_text("frequency_mhz", "145.5")
+        self.assertEqual(form.band_plan_panel.highlighted_frequency, 145.5)
+        self.assertIn("144.4–146 MHz", form.band_plan_panel.summary.text())
 
 
 if __name__ == "__main__":

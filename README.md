@@ -23,6 +23,9 @@ Imaginea de mai sus prezintă tab-ul **Jurnal QSO**: formularul de introducere a
 - **Export/import backup complet (transfer între dispozitive)**: un fișier `.json` portabil cu QSO-urile, repetoarele și profilul operatorului, care se importă pe alt calculator prin **îmbinare** — se adaugă doar ce lipsește, fără să șteargă sau să dubleze ce există deja.
 - **Panou „Condiții de propagare”**: indici meteo spațiali (Kp, SFI, SSN, raze X, vânt solar etc.) de la NOAA/SILSO/GFZ/NRCan/HamQSL și o estimare orientativă zi/noapte pentru benzile HF, cu actualizare automată configurabilă.
 - **Vreme locală**: temperatură, umiditate și condiții curente la poziția stației (Open-Meteo, fără cheie API), plus presiunea atmosferică și vântul de la Aeroportul Internațional Sibiu, afișate direct lângă formularul QSO.
+- **DX Cluster cu geocodare**: spoturi DX în timp real de la un nod DXSpider (conexiune TCP directă, fără cheie API), cu entitatea DXCC, distanța și azimutul față de stația proprie calculate local din prefixul indicativului sau din locatorul din spot; dublu-clic încarcă spotul în formularul QSO.
+- **Interfață adaptată la ecran**: fereastra se dimensionează după rezoluția disponibilă, iar panourile se rearanjează pe una, două sau trei coloane în funcție de lățime (inclusiv pe laptopuri de 1366x768 și la scalare 125–150%).
+- **Referință de benzi ANCOM**: toate segmentele 160m–70cm într-un tabel filtrabil, cu evidențierea automată a segmentului corespunzător frecvenței tastate în formular.
 - **Resetare numerotare ID-uri** pentru QSO-uri, repetoare și stații, fără pierderea datelor.
 
 ## Instalare rapidă (o singură comandă)
@@ -125,13 +128,28 @@ Aplicația pornește maximizată. Antetul afișează titlul aplicației, locator
 
 - **Jurnal QSO** — jurnalul propriu-zis: filtre, formular și tabelul de legături.
 - **Propagare** — panoul de condiții de propagare (afișat doar dacă `show_propagation_panel` este activat în `config.json`; vezi [Panou condiții de propagare](#panou-condiții-de-propagare)).
+- **DX Cluster** — spoturile DX în timp real, localizate după indicativ (afișat doar dacă `show_dx_cluster_panel` este activat; vezi [DX Cluster](#dx-cluster)).
 - **Locație** — rezumatul poziției stației, cu acces rapid la profilul operatorului.
+
+### Adaptarea la rezoluția ecranului
+
+Fereastra se dimensionează după ecranul pe care se deschide, nu după conținut: la pornire ocupă ~85% din zona disponibilă (dimensiunea la care revine când o restaurezi din maximizat), iar dimensiunea minimă nu depășește niciodată ecranul. Anterior fereastra cerea minimum 1550x900 px, ca să încapă cele două tabele fixe din panoul de benzi — pe un laptop de 1366x768 sau pe un ecran cu scalare 125–150% nu putea fi redimensionată ca să încapă.
+
+Panourile din tab-ul **Jurnal QSO** se rearanjează singure după lățimea disponibilă:
+
+| Lățime | Aranjare |
+|---|---|
+| ≥ 1180 px | Legătură, Vreme locală și Benzi și frecvențe, unul lângă altul |
+| 760–1180 px | Legătură și Vreme locală alături, Benzi și frecvențe pe un rând propriu |
+| < 760 px | toate trei, unul sub altul, pe o singură coloană |
+
+Formularul are propria zonă de derulare, iar între el și tabelul de legături există un separator (splitter) tras cu mouse-ul, deci pe un ecran scund tabelul rămâne accesibil în loc să fie împins în afara ferestrei. Scalarea fracționară a afișajului (125%, 150%) este activată explicit la pornire, prin `PassThrough`.
 
 Toate acțiunile de configurare (profil operator, repetoare, setări propagare/vreme locală, resetare ID-uri) sunt disponibile din meniul **Setări**, nu dintr-un tab separat.
 
 ### Jurnal QSO
 
-**Formularul QSO** conține grupul **Legătură**: Indicativ, Nume, Repetor, Frecvență MHz, Bandă, Mod, Locator, Propagare, plus un câmp de **Observații**. Toate detaliile despre formatare, auto-completare și validare sunt în secțiunea [Formularul QSO](#formularul-qso). În dreapta formularului, panoul **Vreme locală** — vezi [Vreme locală](#vreme-locală) — iar în dreapta acestuia, panoul **Benzi și frecvențe** — vezi [Benzi și frecvențe](#benzi-și-frecvențe).
+**Formularul QSO** conține grupul **Legătură**: Indicativ, Nume, Repetor, Frecvență MHz, Bandă, Mod, Locator, Propagare, plus un câmp de **Observații**. Toate detaliile despre formatare, auto-completare și validare sunt în secțiunea [Formularul QSO](#formularul-qso). Lângă formular stau panoul **Vreme locală** — vezi [Vreme locală](#vreme-locală) — și panoul **Benzi și frecvențe** — vezi [Benzi și frecvențe](#benzi-și-frecvențe); aranjarea lor (pe una, două sau trei coloane) urmează lățimea ferestrei, vezi [Adaptarea la rezoluția ecranului](#adaptarea-la-rezoluția-ecranului).
 
 **Acțiuni**: **Salvează QSO** (creează un QSO nou sau actualizează cel încărcat pentru editare — butonul nu își schimbă eticheta, comportamentul depinde de faptul că un QSO este sau nu încărcat), **QSO nou** (golește formularul; dacă erai în mijlocul unei editări, renunță la modificări fără să scrie în baza de date), **Editează** și **Șterge** (acționează asupra rândului selectat în tabel; dacă nu e nimic selectat, nu fac nimic). **Șterge** cere confirmare înainte de eliminarea definitivă.
 
@@ -207,12 +225,45 @@ Lângă formular, panoul **Vreme locală** afișează temperatura, umiditatea ș
 
 ### Benzi și frecvențe
 
-În dreapta panoului **Vreme locală**, panoul **Benzi și frecvențe (referință)** afișează segmentele exacte ale tabelului ANCOM de alocare pentru radioamatori (160m–70cm), în două tabele statice unul lângă altul, într-o zonă cu derulare verticală proprie (cele 24 de segmente nu încap dintr-o dată nici pe un monitor mare, dar restul tab-ului Jurnal QSO rămâne la dimensiunea normală):
+Panoul **Benzi și frecvențe (referință ANCOM)** afișează cele 24 de segmente ale tabelului ANCOM de alocare pentru radioamatori (160m–70cm) într-**un singur tabel**, cu coloanele **Bandă**, **Interval**, **Statut** (Primară/Secundară) și **Partajat cu**. Anterior existau două tabele alăturate, al doilea repetând segmentele partajate — un subset strict al primului — ambele dimensionate în pixeli ficși, ceea ce obliga fereastra să fie lată de ~1550 px.
 
-* **Radioamator — toate segmentele** — toate cele 24 de segmente de frecvență din tabelul ANCOM, cu limitele exacte (MHz) și statutul benzii (Primară/Secundară); fiecare segment este alocat radioamatorilor, unele fiind partajate suplimentar cu utilizare guvernamentală.
-* **Segmente partajate cu utilizare guvernamentală** — doar cele 8 segmente din tabelul de mai sus care poartă și un cod guvernamental ANCOM (`G` sau `G(A)`), cu codul exact și statutul benzii; util pentru a ști exact unde emiți alături de o altă alocare, nu doar exclusiv ca radioamator.
+Coloana **Partajat cu** arată codurile guvernamentale ANCOM (`G`, `G(A)`) pentru segmentele folosite în comun, colorate chihlimbariu, respectiv `exclusiv radioamatori` (verde) pentru restul. Deasupra tabelului sunt trei filtre, care înlocuiesc al doilea tabel:
+
+* **Căutare** — text liber peste bandă, interval și statut (de exemplu `144` sau `secundar`).
+* **Bandă** — restrânge la o singură bandă (`160m` … `70cm`).
+* **Doar partajate** — afișează exclusiv segmentele împărțite cu utilizare guvernamentală.
+
+Tabelul își urmează panoul în lățime (coloana **Interval** preia spațiul rămas), deci nu mai impune o lățime minimă ferestrei.
+
+**Legătura cu formularul:** pe măsură ce scrii în câmpul **Frecvență MHz**, segmentul care conține acea frecvență este evidențiat în albastru și adus în dreptul ochilor, iar rândul de sumar de sub tabel arată explicit ce ai sub cursor — de exemplu `14.205 MHz → 20m 14–14.25 MHz · Primară · exclusiv radioamatori`, sau `101.1 MHz nu este într-un segment listat` pentru o frecvență din afara benzilor de radioamator.
 
 Datele sunt statice (tabelul ANCOM pentru radioamatori, aceleași la fiecare pornire, nicio cerere de rețea) — nu este o listă exhaustivă sau clasificată de sisteme militare specifice, ci exact codurile de partajare publicate de ANCOM. Notele `*`, `**`, `(1)`, `(2)`, `(3)` din sursă sunt păstrate ca atare în tabel, fără textul explicativ al notelor. Verifică întotdeauna reglementarea ANCOM curentă înainte de a folosi aceste date pentru decizii de licențiere.
+
+## DX Cluster
+
+Tab-ul **DX Cluster** afișează spoturile DX în timp real și le localizează după indicativ — aceeași idee ca front-end-urile publice de tip *ham geocoding* (de exemplu [dxcluster.ha8tks.hu/hamgeocoding](https://dxcluster.ha8tks.hu/hamgeocoding/)), dar calculată local.
+
+### Conexiunea
+
+Aplicația se conectează direct la un **nod DX cluster** prin protocolul TCP („telnet”) standard, cel vorbit de nodurile DXSpider/AR-Cluster — fără serviciu web, fără cheie API și fără cont: nodul cere doar indicativul, preluat automat din **Setări → Date operator**. Nodul implicit este `dxfun.com:8000` și poate fi schimbat din **Setări → Setări DX cluster**; orice nod DXSpider funcționează. La conectare se cere și `sh/dx 30`, deci tabelul pornește cu ultimele spoturi, nu gol. Butonul **Conectează/Deconectează** controlează sesiunea; citirea rulează pe un fir de execuție separat, deci interfața rămâne responsivă, iar închiderea aplicației oprește conexiunea.
+
+### Localizarea spoturilor (geocodare)
+
+Pentru fiecare spot, poziția stației DX este determinată în această ordine:
+
+1. **Locatorul Maidenhead**, dacă spotul conține unul (în comentariu sau la finalul liniei `DX de`) — precizie de câțiva kilometri, marcat cu verde în tabel.
+2. **Centrul entității DXCC** deduse din prefixul indicativului — marcat cu gri, pentru că spune „stația e în Japonia”, nu unde anume; pentru o țară mare eroarea este de mii de kilometri.
+3. Dacă prefixul nu e în tabel, spotul rămâne fără poziție (`necunoscut`, distanță `—`) — **nu** se ghicește o țară.
+
+Indicativele compuse sunt interpretate corect: în `DL/YO3ABC/P` decide `DL` (operatorul emite din Germania), iar sufixele de operare (`/P`, `/M`, `/MM`, `/QRP`) și cifrele de zonă (`W1AW/4`) sunt ignorate. Prefixele rusești sunt separate după cifra de zonă (Rusia europeană / asiatică / Kaliningrad). Tabelul de prefixe este static, inclus în aplicație (`call_book/services/callsign_geocoder.py`), și acoperă entitățile care apar curent pe cluster, nu toate cele ~340 DXCC.
+
+Din poziția rezultată se calculează **distanța** și **azimutul** (drum scurt, de la nord adevărat, cu punct cardinal în română) față de stația proprie. Poziția stației se ia din coordonatele detectate în profilul operatorului, iar dacă acestea lipsesc, din locatorul Maidenhead al stației; fără niciuna dintre ele, coloanele arată `—`.
+
+### Tabelul și filtrele
+
+Coloanele sunt: **Ora UTC**, **Frecvență**, **Bandă** (dedusă din frecvență), **Indicativ**, **Entitate** (plus locatorul, dacă a fost găsit), **Distanță**, **Azimut**, **Spotter** și **Comentariu**. Spoturile noi apar sus, duplicatele repetate de nod sunt ignorate, iar lista este limitată la ultimele 500 de spoturi. Filtrele de deasupra: text liber (indicativ, entitate sau comentariu), **bandă**, **continent** și **Doar cele localizate**.
+
+**Dublu-clic pe un spot** (sau butonul **Încarcă în formular**) deschide un QSO nou cu indicativul, frecvența, banda și locatorul completate, și comută pe tab-ul **Jurnal QSO** — de aici legătura se salvează normal.
 
 ## Meniul Fișier
 
@@ -276,6 +327,10 @@ Pe laptopuri fără GPS, Windows poate estima poziția din Wi-Fi, rețea sau alt
 
 **Setări → Setări propagare** conține o bifă **Actualizare automată** și un interval configurabil (1, 5, 10, 15, 30 sau 60 de minute), salvate în `config.json` ca `propagation_auto_refresh_minutes`. **Salvează** persistă valoarea și reprogramează imediat actualizarea automată a panoului de propagare (vezi mai jos). Dezactivarea bifei salvează intervalul ca `"0"`, ceea ce oprește actualizarea automată complet.
 
+### Setări DX cluster
+
+**Setări → Setări DX cluster** configurează nodul la care se conectează tab-ul **DX Cluster**: gazda și portul TCP. Portul este validat (1–65535) înainte de salvare. Dacă ești conectat în acel moment, nodul nou se folosește după o deconectare și o reconectare. Autentificarea se face cu indicativul din **Setări → Date operator**, deci acela trebuie completat înainte de prima conectare.
+
 ### Setări vreme locală
 
 **Setări → Setări vreme locală** funcționează identic cu Setări propagare: o bifă **Actualizare automată** și un interval configurabil (1, 5, 10, 15, 30 sau 60 de minute), salvate în `config.json` ca `local_weather_auto_refresh_minutes` (implicit 30). **Salvează** reprogramează imediat actualizarea automată a panoului **Vreme locală**; dezactivarea bifei salvează `"0"`, oprind actualizarea automată complet și afișând butonul **Actualizează** din panou pentru reîmprospătare manuală.
@@ -308,13 +363,16 @@ Datele agregate sunt păstrate local în `cache/space_weather/latest.json` timp 
 
 ## Configurare (`config.json`)
 
-Fișierul e creat automat la prima pornire, cu chei implicite. Doar trei chei au efect asupra aplicației în acest moment:
+Fișierul e creat automat la prima pornire, cu chei implicite. Cheile care au efect asupra aplicației:
 
 | Cheie | Valori | Efect |
 |---|---|---|
 | `show_propagation_panel` | `"true"` / `"false"` | dacă tab-ul **Propagare** și panoul asociat sunt create la pornire |
+| `show_dx_cluster_panel` | `"true"` / `"false"` | dacă tab-ul **DX Cluster** este creat la pornire |
 | `propagation_auto_refresh_minutes` | `"1"`, `"5"`, `"10"`, `"15"`, `"30"`, `"60"` (orice altă valoare dezactivează) | intervalul actualizării automate a panoului de propagare |
 | `local_weather_auto_refresh_minutes` | `"1"`, `"5"`, `"10"`, `"15"`, `"30"`, `"60"` (orice altă valoare dezactivează) | intervalul actualizării automate a panoului de vreme locală |
+| `dx_cluster_host` | nume de gazdă (implicit `dxfun.com`) | nodul DX cluster la care se conectează tab-ul **DX Cluster** |
+| `dx_cluster_port` | port TCP `1`–`65535` (implicit `8000`) | portul nodului; o valoare invalidă revine la portul implicit |
 
 Fișierul mai reține și câteva chei suplimentare (`user_callsign`, `operator_name`, `grid_square`, `location`, `equipment`, `antenna`, `default_power_w`, `export_directory`, `backup_directory`) care nu sunt citite momentan de aplicație — datele reale ale operatorului sunt stocate în tabelul SQLite `operator_profile`, iar exporturile/backup-ul folosesc directoarele implicite `exports/`/`backups/`.
 
@@ -348,6 +406,10 @@ call_book/                           pachetul aplicației
   validators.py                      validare și benzi
   application_controller.py          cazuri de utilizare independente de UI (LogbookController)
   adif_export.py                     export ADIF
+  services/dx_cluster.py             client TCP pentru noduri DX cluster și parser de spoturi
+  services/callsign_geocoder.py      prefix DXCC / locator -> poziția stației spotate
+  utils/geo.py                       distanță și azimut pe cerc mare
+  ui/dx_cluster_panel.py             tab-ul DX Cluster
   excel_export.py                    export Excel
   backup.py                          backup SQLite online
   transfer.py                        backup complet portabil (export/import JSON, îmbinare la import)
@@ -382,4 +444,6 @@ QT_QPA_PLATFORM=offscreen python -m unittest discover -s tests -v
 
 ## Limitări și extensii
 
-Verificarea vizuală completă a interfeței necesită un calculator cu server grafic sau, ca alternativă headless, bibliotecile de sistem Qt (`libegl1`/`libgl1` etc.) plus `QT_QPA_PLATFORM=offscreen` — configurația folosită și de CI. Nu sunt implementate QRZ, LoTW/eQSL, CAT, cloud, hărți, autentificare sau o aplicație web; modulele actuale permit adăugarea lor ulterioară fără a amesteca UI cu persistența.
+Verificarea vizuală completă a interfeței necesită un calculator cu server grafic sau, ca alternativă headless, bibliotecile de sistem Qt (`libegl1`/`libgl1` etc.) plus `QT_QPA_PLATFORM=offscreen` — configurația folosită și de CI. Nu sunt implementate QRZ, LoTW/eQSL, CAT, cloud, autentificare sau o aplicație web; modulele actuale permit adăugarea lor ulterioară fără a amesteca UI cu persistența.
+
+Spoturile DX sunt localizate, dar **nu** sunt desenate pe o hartă: tab-ul **DX Cluster** afișează entitatea, distanța și azimutul în tabel. Poziția dedusă din prefix este centrul entității DXCC, deci pentru țări mari distanța și azimutul sunt orientative — vezi [Localizarea spoturilor](#localizarea-spoturilor-geocodare). Tabelul de prefixe acoperă entitățile uzuale, nu toate cele ~340 DXCC, și nu se actualizează dintr-un fișier `cty.dat`.
