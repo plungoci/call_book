@@ -66,6 +66,66 @@ class PullFailureMessageTests(TestCase):
         self.assertEqual(launcher._blocked_paths(LOCAL_CHANGES_STDERR), ["alt.txt", "fisier.txt"])
 
 
+def blocked_stderr(paths: list[str], untracked: bool = False) -> str:
+    """Construiește ieșirea lui Git pentru un set dat de fișiere blocate."""
+    header = (
+        "error: The following untracked working tree files would be overwritten by merge:"
+        if untracked
+        else "error: Your local changes to the following files would be overwritten by merge:"
+    )
+    listing = "".join(f"\t{path}\n" for path in paths)
+    return f"{header}\n{listing}Please move or remove them before you merge.\nAborting\n"
+
+
+class LongMessageTests(TestCase):
+    """Un repository ieșit din sincron poate bloca zeci de fișiere deodată.
+
+    Mesajul trebuie să rămână citibil: câteva nume, apoi câte au mai rămas.
+    """
+
+    def test_a_short_list_is_shown_in_full(self) -> None:
+        paths = [f"f{index}.py" for index in range(launcher.MAX_LISTED_PATHS)]
+        message = launcher.describe_pull_failure(blocked_stderr(paths))
+        for path in paths:
+            self.assertIn(path, message)
+        self.assertNotIn("și încă", message)
+        self.assertNotIn("git status", message)
+
+    def test_a_long_list_is_cut_and_the_rest_counted(self) -> None:
+        paths = [f"f{index}.py" for index in range(16)]
+        message = launcher.describe_pull_failure(blocked_stderr(paths))
+        self.assertIn("f0.py", message)
+        self.assertIn(f"și încă {16 - launcher.MAX_LISTED_PATHS} fișiere", message)
+        self.assertNotIn("f15.py", message)
+
+    def test_one_remaining_file_is_written_in_the_singular(self) -> None:
+        paths = [f"f{index}.py" for index in range(launcher.MAX_LISTED_PATHS + 1)]
+        message = launcher.describe_pull_failure(blocked_stderr(paths))
+        self.assertIn("și încă 1 fișier.", message + ".")
+        self.assertNotIn("1 fișiere", message)
+
+    def test_the_full_list_hint_appears_only_when_the_list_was_cut(self) -> None:
+        many = launcher.describe_pull_failure(blocked_stderr([f"f{i}.py" for i in range(9)], untracked=True))
+        self.assertIn("git status", many)
+        few = launcher.describe_pull_failure(blocked_stderr(["f0.py"], untracked=True))
+        self.assertNotIn("git status", few)
+
+    def test_the_message_stays_short_enough_to_read(self) -> None:
+        # The reported case: 16 blocked files in a single printed paragraph.
+        paths = [f"call_book/ui/modul_cu_nume_lung_{index}.py" for index in range(16)]
+        self.assertLess(len(launcher.describe_pull_failure(blocked_stderr(paths, untracked=True))), 400)
+
+    def test_an_unrecognised_git_error_is_quoted_but_not_endlessly(self) -> None:
+        message = launcher.describe_pull_failure("fatal: " + "x" * 2000)
+        self.assertLess(len(message), launcher.MAX_ERROR_CHARACTERS + 100)
+        self.assertTrue(message.endswith("…"))
+
+    def test_a_short_error_is_quoted_whole(self) -> None:
+        message = launcher.describe_pull_failure("fatal: Could not resolve host: github.com")
+        self.assertIn("Could not resolve host: github.com", message)
+        self.assertFalse(message.endswith("…"))
+
+
 class DivergenceMessageTests(TestCase):
     def setUp(self) -> None:
         self.project_dir = Path("/temporary/project")

@@ -10,6 +10,10 @@ from pathlib import Path
 
 GIT_NETWORK_TIMEOUT = 20
 GIT_COMMAND_TIMEOUT = 10
+# Câte fișiere sunt numite într-un mesaj de eroare înainte de „și încă N”.
+MAX_LISTED_PATHS = 3
+# Cât din ieșirea brută a lui Git este citată, când nu are o cauză recunoscută.
+MAX_ERROR_CHARACTERS = 300
 
 
 def run_git_command(
@@ -112,6 +116,25 @@ def _blocked_paths(stderr: str) -> list[str]:
     return paths
 
 
+def _format_paths(paths: list[str], limit: int = MAX_LISTED_PATHS) -> str:
+    """Enumeră cel mult ``limit`` fișiere, apoi spune câte au mai rămas.
+
+    Un repository ieșit din sincron poate produce zeci de fișiere blocate, iar
+    un paragraf cu toate numele nu se citește — primele câteva sunt suficiente
+    ca să recunoști despre ce e vorba, iar `git status` le arată pe toate.
+    """
+    if len(paths) <= limit:
+        return ", ".join(paths)
+    remaining = len(paths) - limit
+    files_word = "fișier" if remaining == 1 else "fișiere"
+    return f"{', '.join(paths[:limit])} și încă {remaining} {files_word}"
+
+
+def _full_list_hint(paths: list[str], limit: int = MAX_LISTED_PATHS) -> str:
+    """Trimite la `git status` doar când lista afișată a fost scurtată."""
+    return " Lista completă: rulează `git status` în directorul aplicației." if len(paths) > limit else ""
+
+
 def describe_pull_failure(stderr: str) -> str:
     """Explică de ce a eșuat actualizarea și ce are de făcut utilizatorul.
 
@@ -121,20 +144,22 @@ def describe_pull_failure(stderr: str) -> str:
     """
     paths = _blocked_paths(stderr)
     if paths and "untracked working tree files" in stderr:
-        listed = ", ".join(paths)
         return (
-            f"Actualizarea a fost anulată: fișierele {listed} există local, dar nu sunt urmărite de Git, "
+            f"Actualizarea a fost anulată: {_format_paths(paths)} există local, dar nu sunt urmărite de Git, "
             "iar versiunea nouă le conține. Mută-le sau șterge-le, apoi pornește din nou aplicația."
+            f"{_full_list_hint(paths)}"
         )
     if paths:
-        listed = ", ".join(paths)
         return (
-            f"Actualizarea a fost anulată ca să nu pierzi modificările locale din: {listed}. "
+            f"Actualizarea a fost anulată ca să nu pierzi modificările locale din: {_format_paths(paths)}. "
             "Rulează `git restore .` dacă nu ai nevoie de ele, sau `git stash` ca să le păstrezi deoparte, "
             "apoi pornește din nou aplicația."
+            f"{_full_list_hint(paths)}"
         )
     details = " ".join(line for line in stderr.splitlines() if line.strip())
     if details:
+        if len(details) > MAX_ERROR_CHARACTERS:
+            details = details[:MAX_ERROR_CHARACTERS].rstrip() + "…"
         return f"Actualizarea a fost anulată. Git a raportat: {details}"
     return "Actualizarea a fost anulată, fără un motiv raportat de Git."
 
