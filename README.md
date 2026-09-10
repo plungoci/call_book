@@ -25,11 +25,54 @@ Imaginea de mai sus prezintă tab-ul **Jurnal QSO**: formularul de introducere a
 - **Vreme locală**: temperatură, umiditate și condiții curente la poziția stației (Open-Meteo, fără cheie API), plus presiunea atmosferică și vântul de la Aeroportul Internațional Sibiu, afișate direct lângă formularul QSO.
 - **Resetare numerotare ID-uri** pentru QSO-uri, repetoare și stații, fără pierderea datelor.
 
-## Cerințe și instalare
+## Instalare rapidă (o singură comandă)
 
-Este necesar Python 3.11+ și o instalare Python care include PySide6 / Qt for Python.
+Pe un calculator nou, o singură comandă face tot: verifică Git și Python 3.11+ (le instalează dacă lipsesc), clonează proiectul, creează mediul virtual `.venv`, instalează dependențele și pornește aplicația.
+
+**Windows** — în PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/plungoci/call_book/main/scripts/install.ps1 | iex"
+```
+
+**Linux / macOS** — în terminal:
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/plungoci/call_book/main/scripts/install.sh | bash
+```
+
+Implicit, proiectul ajunge în `%USERPROFILE%\call_book` (Windows), respectiv `~/call_book` (Linux/macOS), iar pe Windows se creează și o scurtătură **Radio Logbook** pe Desktop. Rularea aceleiași comenzi mai târziu **actualizează** instalarea existentă (fast-forward + dependențe), nu o dublează.
+
+Ce se poate schimba:
+
+| Windows (`scripts/install.ps1`) | Linux/macOS (`scripts/install.sh`) | Efect |
+|---|---|---|
+| `-InstallPath <cale>` | `CALL_BOOK_HOME=<cale>` | alt director de instalare |
+| `-Branch <ramură>` | `CALL_BOOK_BRANCH=<ramură>` | altă ramură decât `main` |
+| `-NoStart` | `CALL_BOOK_NO_START=1` | nu porni aplicația la final |
+| `-NoShortcut` | — | nu crea scurtătura pe Desktop |
+
+Parametrii nu pot fi trimiși prin comanda de mai sus, care execută scriptul direct din rețea; pentru ei, descarcă întâi scriptul:
+
+```powershell
+irm https://raw.githubusercontent.com/plungoci/call_book/main/scripts/install.ps1 -OutFile install.ps1
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -InstallPath D:\radio\call_book -NoStart
+```
+
+```bash
+curl -fsSL -o install.sh https://raw.githubusercontent.com/plungoci/call_book/main/scripts/install.sh
+CALL_BOOK_HOME=~/radio/call_book bash install.sh
+```
+
+Pe Windows, Git și Python lipsă sunt instalate prin `winget`; dacă `winget` nu este disponibil, scriptul se oprește și spune ce trebuie instalat manual. Pe Linux, sunt instalate și bibliotecile de sistem de care are nevoie Qt (`libegl1`, `libgl1`, `libopengl0`, `libxkbcommon0`, `libdbus-1-3`) prin `apt-get`/`dnf`, cerând parola pentru `sudo` doar dacă lipsesc; pe un gestionar de pachete nerecunoscut, scriptul spune exact ce lipsește în loc să continue orbește.
+
+## Cerințe și instalare (pas cu pas)
+
+Dacă preferi instalarea manuală, este necesar Python 3.11+ și o instalare Python care include PySide6 / Qt for Python.
+
+```bash
+git clone https://github.com/plungoci/call_book.git
+cd call_book
 python -m venv .venv
 ```
 
@@ -63,11 +106,12 @@ Pornește întotdeauna aplicația prin lansator:
 python launcher.py
 ```
 
+Sau, mai simplu, prin lansatorul din rădăcina proiectului — `Launcher.bat` pe Windows, `./Launcher.sh` pe Linux/macOS. Amândouă folosesc automat Python-ul din `.venv`, dacă mediul virtual există, și cad înapoi pe Python-ul din sistem dacă nu, deci nu trebuie activat manual mediul virtual înainte de fiecare pornire.
+
 Nu porni direct `python main.py`: `main.py` rămâne punctul de intrare PySide6, dar este pornit automat de lansator. La fiecare pornire, lansatorul verifică actualizările ramurii Git curente și aplică numai actualizări fast-forward. Dacă `requirements.txt` s-a schimbat, dependențele sunt instalate în același mediu Python.
 
 Pentru actualizare automată, Git trebuie să fie instalat, iar proiectul trebuie obținut cu `git clone`, nu descărcat ca arhivă ZIP. Dacă nu există conexiune sau verificarea actualizărilor eșuează, aplicația pornește în continuare cu versiunea locală. Modificările locale nu sunt șterse, puse în stash sau suprascrise automat; o actualizare care nu poate fi aplicată fast-forward este anulată.
 
-Pe Windows, `Launcher.bat` rulează `python launcher.py`.
 
 ## Fereastra principală
 
@@ -285,6 +329,9 @@ Niciunul dintre acestea nu e urcat în Git (vezi `.gitignore`).
 ```text
 launcher.py                          pornire și actualizare automată sigură
 main.py                              punct de intrare PySide6, pornit de launcher
+Launcher.bat Launcher.sh             pornire cu Python-ul din .venv (Windows, respectiv Linux/macOS)
+scripts/install.ps1                  instalare completă cu o comandă, pe Windows
+scripts/install.sh                   instalare completă cu o comandă, pe Linux/macOS
 pyproject.toml                       pachet, configurare ruff și mypy
 requirements.txt                     dependențe de rulare (folosit și de launcher.py)
 .github/workflows/ci.yml             CI: ruff, mypy și teste, headless
