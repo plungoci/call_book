@@ -6,6 +6,9 @@ import json
 import logging
 from pathlib import Path
 
+from .services.dx_cluster import DEFAULT_HOST as DEFAULT_DX_CLUSTER_HOST
+from .services.dx_cluster import DEFAULT_PORT as DEFAULT_DX_CLUSTER_PORT
+
 CONFIG_PATH = Path("config.json")
 DEFAULT_CONFIG = {
     "user_callsign": "",
@@ -18,11 +21,26 @@ DEFAULT_CONFIG = {
     "export_directory": "exports",
     "backup_directory": "backups",
     "show_propagation_panel": "true",
+    "show_dx_cluster_panel": "true",
     "propagation_auto_refresh_minutes": "15",
     "local_weather_auto_refresh_minutes": "30",
+    "dx_cluster_host": DEFAULT_DX_CLUSTER_HOST,
+    "dx_cluster_port": str(DEFAULT_DX_CLUSTER_PORT),
 }
 REFRESH_INTERVAL_OPTIONS = ("1", "5", "10", "15", "30", "60")
 REFRESH_INTERVALS = frozenset(REFRESH_INTERVAL_OPTIONS)
+
+
+def dx_cluster_node(config: dict[str, str]) -> tuple[str, int]:
+    """Return the configured cluster node, falling back to the default port."""
+    host = (config.get("dx_cluster_host") or DEFAULT_DX_CLUSTER_HOST).strip()
+    try:
+        port = int(config.get("dx_cluster_port") or DEFAULT_DX_CLUSTER_PORT)
+    except ValueError:
+        port = DEFAULT_DX_CLUSTER_PORT
+    if not 1 <= port <= 65535:
+        port = DEFAULT_DX_CLUSTER_PORT
+    return host or DEFAULT_DX_CLUSTER_HOST, port
 
 
 def load_config(path: Path = CONFIG_PATH) -> dict[str, str]:

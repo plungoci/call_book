@@ -25,7 +25,23 @@ ANCOM regulation for what each one means.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+
+# "1.81–1.83 MHz" and "70–70.3 MHz(2)" alike: two MHz numbers separated by an
+# en dash (or a plain hyphen), with the source's footnote markers ignored.
+_RANGE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*[–-]\s*(\d+(?:\.\d+)?)\s*MHz")
+
+
+def parse_frequency_range(frequency_range: str) -> tuple[float, float]:
+    """Return the (start, end) MHz bounds written in a segment's frequency text."""
+    match = _RANGE_RE.search(frequency_range)
+    if not match:
+        raise ValueError(f"Interval de frecvență nerecunoscut: {frequency_range!r}")
+    start, end = float(match.group(1)), float(match.group(2))
+    if end <= start:
+        raise ValueError(f"Interval de frecvență inversat: {frequency_range!r}")
+    return start, end
 
 
 @dataclass(frozen=True)
@@ -38,6 +54,30 @@ class BandSegment:
     @property
     def is_shared_with_government(self) -> bool:
         return self.allocation_status != "NG"
+
+    @property
+    def bounds_mhz(self) -> tuple[float, float]:
+        """The segment's numeric MHz bounds, parsed from ``frequency_range``.
+
+        Kept derived rather than stored as extra fields so the table above
+        stays the single source of truth and the two can never disagree.
+        """
+        return parse_frequency_range(self.frequency_range)
+
+    def contains(self, frequency_mhz: float) -> bool:
+        """Return whether a frequency falls inside this segment (bounds included)."""
+        start, end = self.bounds_mhz
+        return start <= frequency_mhz <= end
+
+    @property
+    def band_label(self) -> str:
+        """The band name without the source's footnote markers (e.g. "60m**" -> "60m")."""
+        return self.band.rstrip("*")
+
+    @property
+    def shared_with(self) -> str:
+        """The non-amateur usage codes sharing this segment, e.g. "G(A), G"."""
+        return ", ".join(code for code in self.allocation_status.split("/") if code != "NG")
 
 
 AMATEUR_SEGMENTS: tuple[BandSegment, ...] = (
@@ -70,3 +110,13 @@ AMATEUR_SEGMENTS: tuple[BandSegment, ...] = (
 SHARED_SEGMENTS: tuple[BandSegment, ...] = tuple(
     segment for segment in AMATEUR_SEGMENTS if segment.is_shared_with_government
 )
+
+
+def segments_for_frequency(frequency_mhz: float) -> tuple[BandSegment, ...]:
+    """Return every listed segment covering a frequency, in table order."""
+    return tuple(segment for segment in AMATEUR_SEGMENTS if segment.contains(frequency_mhz))
+
+
+def band_labels() -> tuple[str, ...]:
+    """Return the distinct band names, in the order they appear in the table."""
+    return tuple(dict.fromkeys(segment.band_label for segment in AMATEUR_SEGMENTS))

@@ -30,6 +30,14 @@ from .local_weather_panel import LocalWeatherPanel
 # fill the whole window width, leaving room for the weather panel beside them.
 _FIELD_MAX_WIDTH = 220
 
+# Width thresholds, in pixels, at which the three top panels re-flow. Below
+# _WIDE the band plan drops to its own full-width row; below _MEDIUM the
+# weather panel follows, leaving a single column for a narrow window or a
+# small laptop screen. The values are the panels' comfortable widths added
+# up, not device sizes — the layout follows the space it is actually given.
+_WIDE_LAYOUT_WIDTH = 1180
+_MEDIUM_LAYOUT_WIDTH = 760
+
 MODES = (
     "FM",
     "AM",
@@ -111,12 +119,12 @@ class QSOForm(QGroupBox):
         self._applying_suggestion = False
 
         layout = QVBoxLayout(self)
-        grid = QGridLayout()
-        layout.addLayout(grid)
-        for column, (title, keys) in enumerate(FIELD_GROUPS):
-            box = QGroupBox(title)
+        self.grid = QGridLayout()
+        layout.addLayout(self.grid)
+        self.fields_box = QGroupBox(FIELD_GROUPS[0][0])
+        for title, keys in FIELD_GROUPS:
+            box = self.fields_box if title == FIELD_GROUPS[0][0] else QGroupBox(title)
             form = QFormLayout(box)
-            grid.addWidget(box, 0, column, 1, len(FIELD_GROUPS))
             for key in keys:
                 widget = self._create_widget(key)
                 # A missing translation must not prevent the logbook from
@@ -128,17 +136,17 @@ class QSOForm(QGroupBox):
                 form.addRow(label_text, widget)
                 self.fields[key] = widget
         self.weather_panel = LocalWeatherPanel(self.location_provider)
-        self.weather_panel.setMaximumWidth(320)
-        grid.addWidget(self.weather_panel, 0, len(FIELD_GROUPS))
         self.band_plan_panel = BandPlanPanel()
-        grid.addWidget(self.band_plan_panel, 0, len(FIELD_GROUPS) + 1)
-        # The scroll area inside BandPlanPanel doesn't report a sizeHint wide
-        # enough to claim its fair share automatically; claim leftover width
-        # explicitly so both its inner tables fit side by side when possible.
-        grid.setColumnStretch(len(FIELD_GROUPS) + 1, 1)
+        self.layout_mode = ""
+        self._relayout(_WIDE_LAYOUT_WIDTH)
 
         self.notes = QTextEdit()
-        self.notes.setFixedHeight(72)
+        # A range rather than a fixed height: the box may grow a little with
+        # the window, without turning into a wall of empty space.
+        self.notes.setMinimumHeight(56)
+        self.notes.setMaximumHeight(110)
+        # Unlabelled, so without this the empty box reads as a gap in the form.
+        self.notes.setPlaceholderText("Note despre QSO…")
         self.notes.setToolTip("Informații suplimentare despre QSO.")
         layout.addWidget(self.notes)
 
@@ -152,6 +160,7 @@ class QSOForm(QGroupBox):
             lambda text: self._format_live_input("operator_name", format_operator_name, text)
         )
         self._line("frequency_mhz").textChanged.connect(self._frequency_changed)
+        self._line("frequency_mhz").textChanged.connect(self.band_plan_panel.highlight_frequency)
         self._line("band").textChanged.connect(self._context)
         self._line("band").textChanged.connect(self._update_propagation_suggestion)
         self.fields["mode"].currentTextChanged.connect(self._update_propagation_suggestion)
@@ -163,6 +172,54 @@ class QSOForm(QGroupBox):
         # the database were absent when the application first opened.
         self.refresh_repeaters()
         self.new()
+
+    def _layout_mode_for(self, width):
+        if width >= _WIDE_LAYOUT_WIDTH:
+            return "wide"
+        return "medium" if width >= _MEDIUM_LAYOUT_WIDTH else "narrow"
+
+    def _relayout(self, width):
+        """Arrange the three top panels for the width actually available.
+
+        wide    fields | vreme | plan de benzi   (one row)
+        medium  fields | vreme, plan de benzi below, full width
+        narrow  everything stacked in a single column
+
+        Re-parenting is done by re-adding the widgets: QGridLayout keeps a
+        widget at only one cell, so ``addWidget`` at a new position moves it.
+        """
+        mode = self._layout_mode_for(width)
+        if mode == self.layout_mode:
+            return
+        self.layout_mode = mode
+        for column in range(3):
+            self.grid.setColumnStretch(column, 0)
+        if mode == "wide":
+            # widget, row, column, column span
+            placements = ((self.fields_box, 0, 0, 1), (self.weather_panel, 0, 1, 1), (self.band_plan_panel, 0, 2, 1))
+            self.grid.setColumnStretch(2, 1)
+        elif mode == "medium":
+            placements = ((self.fields_box, 0, 0, 1), (self.weather_panel, 0, 1, 1), (self.band_plan_panel, 1, 0, 2))
+            self.grid.setColumnStretch(1, 1)
+        else:
+            placements = ((self.fields_box, 0, 0, 1), (self.weather_panel, 1, 0, 1), (self.band_plan_panel, 2, 0, 1))
+            self.grid.setColumnStretch(0, 1)
+        for widget, row, column, span in placements:
+            self.grid.addWidget(widget, row, column, 1, span)
+        # Beside the fields the weather panel must stay narrow; on its own row
+        # there is no reason to cap it.
+        self.weather_panel.setMaximumWidth(320 if mode != "narrow" else 16777215)
+        self.updateGeometry()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # Shrinking can take two passes: while the panels are still side by
+        # side the form's minimum width is large, so the first pass may only
+        # get as far as "medium". Re-flowing lowers that minimum, the
+        # enclosing scroll area re-applies its viewport width, and the second
+        # pass settles on the right mode. updateGeometry() is what tells the
+        # scroll area the minimum has changed.
+        self._relayout(event.size().width())
 
     def _create_widget(self, key):
         widget = QComboBox() if key in COMBO_BOX_FIELDS else QLineEdit()
