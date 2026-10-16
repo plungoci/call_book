@@ -189,14 +189,25 @@ install_dependencies() {
     step "Instalez dependențele Python (PySide6, openpyxl, curl_cffi)..."
     "$VENV_PYTHON" -m pip install --upgrade pip </dev/null
     "$VENV_PYTHON" -m pip install --upgrade -r "$INSTALL_PATH/requirements.txt" </dev/null
+}
+
+# Rulează după ensure_qt_libraries: importul QtWidgets are nevoie de libEGL & co.
+verify_dependencies() {
+    step "Verific instalarea..."
     "$VENV_PYTHON" -c 'import PySide6.QtWidgets, openpyxl, curl_cffi' ||
-        fail "Dependențele Python s-au instalat, dar nu pot fi importate."
+        fail "Dependențele Python s-au instalat, dar nu pot fi importate (vezi eroarea de mai sus)."
+    echo "Totul este în regulă."
 }
 
 # Afișează bibliotecile de care are nevoie pluginul X11 al lui Qt și care lipsesc.
 missing_qt_libraries() {
     local plugin
-    plugin="$("$VENV_PYTHON" -c 'import pathlib, PySide6; print(next(pathlib.Path(PySide6.__file__).parent.glob("Qt/plugins/platforms/libqxcb.so"), ""))')"
+    # Pachetul e localizat fără să fie importat: importul ar cere chiar
+    # bibliotecile de sistem pe care le căutăm.
+    plugin="$("$VENV_PYTHON" -c 'import importlib.util, pathlib
+spec = importlib.util.find_spec("PySide6")
+roots = list(spec.submodule_search_locations or []) if spec else []
+print(next((str(p) for r in roots for p in pathlib.Path(r).glob("Qt/plugins/platforms/libqxcb.so")), ""))')"
     if [ -n "$plugin" ] && command -v ldd >/dev/null 2>&1; then
         ldd "$plugin" | awk '/not found/ { print $1 }' | sort -u
     fi
@@ -257,6 +268,7 @@ main() {
     create_venv
     install_dependencies
     ensure_qt_libraries
+    verify_dependencies
     chmod +x "$INSTALL_PATH/Launcher.sh" 2>/dev/null || true
 
     printf '\nRadio Logbook este instalat.\n'
