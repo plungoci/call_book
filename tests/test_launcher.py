@@ -265,8 +265,95 @@ class LauncherTests(TestCase):
         self.assertTrue(launcher.install_requirements(self.project_dir))
         self.assertEqual(run.call_args.args[0][:3], [launcher.sys.executable, "-m", "pip"])
 
-    @patch("launcher.start_application")
+    @patch("launcher.start_application", return_value=0)
+    @patch("launcher.ensure_requirements", return_value=True)
     @patch("launcher.check_for_updates", return_value=False)
-    def test_main_starts_application_when_update_fails(self, _: MagicMock, start: MagicMock) -> None:
-        launcher.main()
+    def test_main_starts_application_when_update_fails(self, _: MagicMock, __: MagicMock, start: MagicMock) -> None:
+        self.assertEqual(launcher.main(), 0)
         start.assert_called_once_with(Path(launcher.__file__).resolve().parent)
+
+    @patch("launcher.start_application")
+    @patch("launcher.ensure_requirements", return_value=False)
+    @patch("launcher.check_for_updates", return_value=False)
+    def test_main_does_not_start_without_dependencies(self, _: MagicMock, __: MagicMock, start: MagicMock) -> None:
+        with redirect_stdout(StringIO()):
+            self.assertEqual(launcher.main(), 1)
+        start.assert_not_called()
+
+
+class DependencyTests(TestCase):
+    """O instalare întreruptă trebuie să se repare la următoarea pornire."""
+
+    def setUp(self) -> None:
+        self.project_dir = Path("/temporary/project")
+
+    @patch("launcher.importlib.util.find_spec", return_value=object())
+    def test_no_missing_modules_when_everything_is_installed(self, _: MagicMock) -> None:
+        self.assertEqual(launcher.missing_modules(), [])
+
+    @patch("launcher.importlib.util.find_spec", side_effect=ModuleNotFoundError("PySide6"))
+    def test_a_missing_parent_package_counts_as_missing(self, _: MagicMock) -> None:
+        self.assertEqual(launcher.missing_modules(), ["PySide6", "openpyxl", "curl_cffi"])
+
+    @patch("launcher.install_requirements")
+    @patch("launcher.missing_modules", return_value=[])
+    def test_installed_dependencies_skip_pip(self, _: MagicMock, install: MagicMock) -> None:
+        self.assertTrue(launcher.ensure_requirements(self.project_dir))
+        install.assert_not_called()
+
+    @patch("launcher.install_requirements", return_value=True)
+    @patch("launcher.missing_modules", side_effect=[["openpyxl"], []])
+    def test_missing_dependencies_are_installed(self, _: MagicMock, install: MagicMock) -> None:
+        with redirect_stdout(StringIO()):
+            self.assertTrue(launcher.ensure_requirements(self.project_dir))
+        install.assert_called_once_with(self.project_dir)
+
+    @patch("launcher.install_requirements", return_value=False)
+    @patch("launcher.missing_modules", return_value=["openpyxl"])
+    def test_failed_install_points_to_the_installer(self, _: MagicMock, __: MagicMock) -> None:
+        with redirect_stdout(StringIO()) as output:
+            self.assertFalse(launcher.ensure_requirements(self.project_dir))
+        self.assertIn("scriptul de instalare", output.getvalue())
+
+    @patch("launcher.subprocess.run", side_effect=subprocess.TimeoutExpired("pip", 1))
+    def test_a_pip_timeout_is_reported_as_failure(self, _: MagicMock) -> None:
+        with redirect_stdout(StringIO()):
+            self.assertFalse(launcher.install_requirements(self.project_dir))
+
+
+class StartApplicationTests(TestCase):
+    """Lansatorul așteaptă aplicația, ca o eroare de pornire să rămână vizibilă."""
+
+    def setUp(self) -> None:
+        self.project_dir = Path("/temporary/project")
+
+    @patch("launcher.subprocess.call", return_value=0)
+    def test_waits_for_the_application_with_the_same_python(self, call: MagicMock) -> None:
+        with redirect_stdout(StringIO()):
+            self.assertEqual(launcher.start_application(self.project_dir), 0)
+        self.assertEqual(call.call_args.args[0], [launcher.sys.executable, str(self.project_dir / "main.py")])
+        self.assertEqual(call.call_args.kwargs["cwd"], self.project_dir)
+
+    @patch("launcher.subprocess.call", return_value=3)
+    def test_a_crash_is_reported_with_its_exit_code(self, _: MagicMock) -> None:
+        with redirect_stdout(StringIO()) as output:
+            self.assertEqual(launcher.start_application(self.project_dir), 3)
+        self.assertIn("cod 3", output.getvalue())
+
+    @patch("launcher.subprocess.call", return_value=-6)
+    def test_a_signal_becomes_a_plain_failure_code(self, _: MagicMock) -> None:
+        with redirect_stdout(StringIO()):
+            self.assertEqual(launcher.start_application(self.project_dir), 1)
+
+    @patch("launcher.sys.platform", "linux")
+    def test_a_qt_abort_on_linux_mentions_the_system_libraries(self) -> None:
+        self.assertIn("libxcb-cursor0", launcher.describe_crash(-6))
+
+    @patch("launcher.sys.platform", "win32")
+    def test_other_crashes_do_not_blame_linux_libraries(self) -> None:
+        self.assertNotIn("libxcb", launcher.describe_crash(1))
+
+    @patch("launcher.subprocess.call", side_effect=OSError("lipsă"))
+    def test_an_unstartable_application_is_a_failure(self, _: MagicMock) -> None:
+        with redirect_stdout(StringIO()):
+            self.assertEqual(launcher.start_application(self.project_dir), 1)

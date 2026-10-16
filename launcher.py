@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import shutil
 import subprocess
 import sys
@@ -14,6 +15,15 @@ GIT_COMMAND_TIMEOUT = 10
 MAX_LISTED_PATHS = 3
 # Cât din ieșirea brută a lui Git este citată, când nu are o cauză recunoscută.
 MAX_ERROR_CHARACTERS = 300
+# Modulele fără de care aplicația nu poate porni, câte unul din fiecare pachet
+# din requirements.txt.
+REQUIRED_MODULES = ("PySide6.QtWidgets", "openpyxl", "curl_cffi")
+# Prima instalare descarcă ~100 MB; pe o conexiune lentă durează minute bune.
+PIP_TIMEOUT = 1800
+INSTALLER_HINT = (
+    "Rulează din nou scriptul de instalare (vezi README, „Instalare rapidă”): "
+    "creează mediul virtual .venv și instalează tot ce lipsește."
+)
 
 
 def run_git_command(
@@ -70,25 +80,51 @@ def requirements_changed(project_dir: Path, old_commit: str, new_commit: str) ->
 
 
 def install_requirements(project_dir: Path) -> bool:
-    """Instalează dependențele în mediul Python care rulează lansatorul."""
-    print("Fișierul requirements.txt s-a modificat. Actualizez dependențele...")
+    """Instalează dependențele în mediul Python care rulează lansatorul.
+
+    Ieșirea lui pip nu este capturată, ca progresul descărcării să fie vizibil.
+    """
+    print("Instalez dependențele din requirements.txt...")
     try:
         result = subprocess.run(
             [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
             cwd=project_dir,
-            capture_output=True,
-            text=True,
             check=False,
-            timeout=120,
+            timeout=PIP_TIMEOUT,
         )
     except (OSError, subprocess.TimeoutExpired):
-        print("Nu am putut instala dependențele. Pornesc versiunea locală.")
+        print("Nu am putut instala dependențele.")
         return False
     if result.returncode != 0:
-        print("Nu am putut instala dependențele. Pornesc versiunea locală.")
+        print("Nu am putut instala dependențele.")
         return False
-    print("Dependențele au fost actualizate cu succes.")
+    print("Dependențele au fost instalate cu succes.")
     return True
+
+
+def missing_modules() -> list[str]:
+    """Returnează modulele necesare aplicației care nu pot fi găsite."""
+    missing = []
+    for module in REQUIRED_MODULES:
+        try:
+            found = importlib.util.find_spec(module) is not None
+        except (ImportError, ValueError):
+            found = False
+        if not found:
+            missing.append(module.split(".")[0])
+    return missing
+
+
+def ensure_requirements(project_dir: Path) -> bool:
+    """Instalează dependențele lipsă, ca o instalare întreruptă să se repare singură."""
+    missing = missing_modules()
+    if not missing:
+        return True
+    print(f"Lipsesc pachetele Python: {', '.join(missing)}.")
+    if install_requirements(project_dir) and not missing_modules():
+        return True
+    print(f"Aplicația nu poate porni fără ele. {INSTALLER_HINT}")
+    return False
 
 
 def _remote_is_newer(project_dir: Path, local_commit: str, remote_commit: str) -> bool:
@@ -226,27 +262,63 @@ def check_for_updates(project_dir: Path) -> bool:
         print("Actualizarea a reușit, dar nu am putut verifica noul commit.")
         return True
     if requirements_changed(project_dir, local_commit, new_commit):
+        print("Fișierul requirements.txt s-a modificat.")
         install_requirements(project_dir)
     print("Actualizarea a fost instalată cu succes.")
     return True
 
 
-def start_application(project_dir: Path) -> None:
-    """Pornește main.py separat, astfel încât lansatorul se poate încheia imediat."""
+def describe_crash(returncode: int) -> str:
+    """Explică, cât se poate, de ce aplicația s-a oprit cu eroare."""
+    message = f"Aplicația s-a oprit cu eroare (cod {returncode}). Detaliile sunt în mesajele de mai sus."
+    # Qt termină procesul cu abort() (SIGABRT) când nu își poate încărca
+    # pluginul de afișare — pe Linux, aproape mereu o bibliotecă de sistem lipsă.
+    if sys.platform.startswith("linux") and returncode in (-6, 134):
+        message += (
+            " Pe Linux, cauza obișnuită este o bibliotecă de sistem lipsă pentru Qt "
+            "(de exemplu libxcb-cursor0); scriptul scripts/install.sh le detectează și le instalează."
+        )
+    return message
+
+
+def start_application(project_dir: Path) -> int:
+    """Pornește main.py și așteaptă închiderea lui, ca o eroare să rămână vizibilă.
+
+    Lansatorul nu se încheie înaintea aplicației: pe Windows, consola s-ar
+    închide odată cu el și ar lua cu ea orice mesaj de eroare.
+    """
     main_file = project_dir / "main.py"
     print("Pornesc aplicația...")
     try:
-        subprocess.Popen([sys.executable, str(main_file)], cwd=project_dir)
+        returncode = subprocess.call([sys.executable, str(main_file)], cwd=project_dir)
     except OSError as error:
         print(f"Nu am putut porni aplicația: {error}")
+        return 1
+    except KeyboardInterrupt:
+        return 130
+    if returncode != 0:
+        print(describe_crash(returncode))
+        # Un proces oprit de un semnal are cod negativ; spre exterior, doar „eșuat”.
+        return returncode if returncode > 0 else 1
+    return 0
 
 
-def main() -> None:
-    """Determină directorul proiectului, actualizează opțional și pornește aplicația."""
+def main() -> int:
+    """Actualizează opțional, verifică dependențele și pornește aplicația.
+
+    Returnează codul de ieșire al aplicației; Launcher.bat ține fereastra
+    deschisă când acesta nu este 0.
+    """
     project_dir = Path(__file__).resolve().parent
+    # Mesajele lansatorului trebuie să apară înaintea ieșirii lui pip și a
+    # aplicației, chiar și când consola este redirecționată într-un fișier.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(line_buffering=True)
     check_for_updates(project_dir)
-    start_application(project_dir)
+    if not ensure_requirements(project_dir):
+        return 1
+    return start_application(project_dir)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

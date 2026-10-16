@@ -90,6 +90,16 @@ class InstallScriptTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_linux_installer_runs_only_after_being_read_completely(self) -> None:
+        # Cu `curl ... | bash`, o comandă care citește din stdin ar înghiți restul
+        # scriptului; de aceea tot codul stă în `main`, apelată pe ultimul rând.
+        lines = [line for line in INSTALL_SH.read_text(encoding="utf-8").splitlines() if line.strip()]
+        self.assertEqual(lines[-1], 'main "$@"')
+
+    def test_installers_check_the_qt_xcb_cursor_library(self) -> None:
+        # Fără libxcb-cursor, Qt 6.5+ nu poate deschide nicio fereastră pe X11.
+        self.assertIn("libxcb-cursor.so.0", INSTALL_SH.read_text(encoding="utf-8"))
+
     @unittest.skipUnless(shutil.which("sh"), "shell POSIX indisponibil")
     def test_launcher_is_valid_posix_shell(self) -> None:
         result = subprocess.run(["sh", "-n", str(LAUNCHER_SH)], capture_output=True, text=True, check=False, timeout=30)
