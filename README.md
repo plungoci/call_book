@@ -30,12 +30,12 @@ Imaginea de mai sus prezintă tab-ul **Jurnal QSO**: formularul de introducere a
 
 ## Instalare rapidă (o singură comandă)
 
-Pe un calculator nou, o singură comandă face tot: verifică Git și Python 3.11+ (le instalează dacă lipsesc), clonează proiectul, creează mediul virtual `.venv`, instalează dependențele și pornește aplicația.
+Pe un calculator nou, o singură comandă face tot: verifică Git și Python 3.11+ (le instalează dacă lipsesc), clonează proiectul, creează mediul virtual `.venv`, instalează dependențele și — pe Linux — bibliotecile de sistem de care are nevoie Qt, verifică instalarea și pornește aplicația.
 
-**Windows** — în PowerShell:
+**Windows** — în PowerShell (sau în fereastra **Run**, `Win+R`):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/plungoci/call_book/main/scripts/install.ps1 | iex"
+powershell -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = 'Tls12'; irm https://raw.githubusercontent.com/plungoci/call_book/main/scripts/install.ps1 | iex"
 ```
 
 **Linux / macOS** — în terminal:
@@ -44,34 +44,36 @@ powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.c
 curl -fsSL https://raw.githubusercontent.com/plungoci/call_book/main/scripts/install.sh | bash
 ```
 
-Implicit, proiectul ajunge în `%USERPROFILE%\call_book` (Windows), respectiv `~/call_book` (Linux/macOS), iar pe Windows se creează și o scurtătură **Radio Logbook** pe Desktop. Rularea aceleiași comenzi mai târziu **actualizează** instalarea existentă (fast-forward + dependențe), nu o dublează.
+Implicit, proiectul ajunge în `%USERPROFILE%\call_book` (Windows), respectiv `~/call_book` (Linux/macOS), iar pe Windows se creează și o scurtătură **Radio Logbook** pe Desktop. Rularea aceleiași comenzi mai târziu **actualizează și repară** instalarea existentă: aduce versiunea nouă (fast-forward), recreează un mediu virtual stricat și reinstalează dependențele lipsă — nu dublează nimic și nu atinge datele din `data/`.
 
 Ce se poate schimba:
 
 | Windows (`scripts/install.ps1`) | Linux/macOS (`scripts/install.sh`) | Efect |
 |---|---|---|
 | `-InstallPath <cale>` | `CALL_BOOK_HOME=<cale>` | alt director de instalare |
-| `-Branch <ramură>` | `CALL_BOOK_BRANCH=<ramură>` | altă ramură decât `main` |
+| `-Branch <ramură>` | `CALL_BOOK_BRANCH=<ramură>` | altă ramură decât `main` (doar la prima instalare) |
 | `-NoStart` | `CALL_BOOK_NO_START=1` | nu porni aplicația la final |
 | `-NoShortcut` | — | nu crea scurtătura pe Desktop |
 
-Parametrii nu pot fi trimiși prin comanda de mai sus, care execută scriptul direct din rețea; pentru ei, descarcă întâi scriptul:
+Cu parametri, scriptul se descarcă și se rulează tot dintr-o singură comandă:
 
 ```powershell
-irm https://raw.githubusercontent.com/plungoci/call_book/main/scripts/install.ps1 -OutFile install.ps1
-powershell -ExecutionPolicy Bypass -File .\install.ps1 -InstallPath D:\radio\call_book -NoStart
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/plungoci/call_book/main/scripts/install.ps1))) -InstallPath D:\radio\call_book -NoStart
 ```
 
 ```bash
-curl -fsSL -o install.sh https://raw.githubusercontent.com/plungoci/call_book/main/scripts/install.sh
-CALL_BOOK_HOME=~/radio/call_book bash install.sh
+curl -fsSL https://raw.githubusercontent.com/plungoci/call_book/main/scripts/install.sh | CALL_BOOK_HOME=~/radio/call_book bash
 ```
 
-Pe Windows, Git și Python lipsă sunt instalate prin `winget`; dacă `winget` nu este disponibil, scriptul se oprește și spune ce trebuie instalat manual. Pe Linux, sunt instalate și bibliotecile de sistem de care are nevoie Qt (`libegl1`, `libgl1`, `libopengl0`, `libxkbcommon0`, `libdbus-1-3`) prin `apt-get`/`dnf`, cerând parola pentru `sudo` doar dacă lipsesc; pe un gestionar de pachete nerecunoscut, scriptul spune exact ce lipsește în loc să continue orbește.
+Ce face fiecare script, pe scurt:
+
+- **Windows**: Git și Python lipsă sunt instalate prin `winget`; dacă `winget` nu este disponibil, scriptul se oprește și spune ce trebuie instalat manual. Python este căutat întâi ca `py -3.13`/`-3.12`/`-3.11` (versiuni pentru care PySide6 are pachete), apoi în directoarele standard ale instalatorului python.org — deci funcționează și dacă Python nu a fost adăugat în `PATH`. Scurtătura din Microsoft Store (`python.exe` care deschide Store-ul) este ignorată.
+- **Linux**: după instalarea PySide6, scriptul verifică cu `ldd` exact ce biblioteci îi lipsesc pluginului de afișare Qt (de exemplu `libxcb-cursor0`, fără de care Qt 6.5+ nu deschide nicio fereastră pe X11) și le instalează prin `apt-get`, `dnf`, `pacman` sau `zypper`, cerând parola pentru `sudo` doar dacă lipsește ceva. Pe Ubuntu 22.04, unde `python3` este 3.10, instalează `python3.12` sau `python3.11`; pe Debian/Ubuntu instalează și `python3-venv` când lipsește.
+- **Ambele**: un mediu `.venv` creat pe jumătate (fără `pip`) este recreat, iar la final scriptul verifică faptul că `PySide6`, `openpyxl` și `curl_cffi` chiar se pot importa, înainte să spună că instalarea a reușit.
 
 ## Cerințe și instalare (pas cu pas)
 
-Dacă preferi instalarea manuală, este necesar Python 3.11+ și o instalare Python care include PySide6 / Qt for Python.
+Dacă preferi instalarea manuală, ai nevoie de Git și de Python 3.11–3.13.
 
 ```bash
 git clone https://github.com/plungoci/call_book.git
@@ -79,22 +81,22 @@ cd call_book
 python -m venv .venv
 ```
 
-Windows:
+Pe Windows, dacă `python` deschide Microsoft Store, folosește `py -3.12 -m venv .venv`. Pe Debian/Ubuntu, dacă apare `ensurepip is not available`, instalează întâi `sudo apt install python3-venv`.
+
+Instalează dependențele de rulare — `PySide6-Essentials` (interfața grafică: modulele QtCore, QtGui și QtWidgets, importate ca `PySide6`), `openpyxl` (export Excel) și `curl_cffi` (cereri HTTP către serviciile de propagare și meteo) — direct cu Python-ul din mediul virtual, fără să fie nevoie de activarea lui:
 
 ```bash
-.venv\Scripts\activate
+# Windows
+.venv\Scripts\python -m pip install -r requirements.txt
+# Linux/macOS
+.venv/bin/python -m pip install -r requirements.txt
 ```
 
-Linux/macOS:
+Pe Linux, Qt are nevoie și de câteva biblioteci de sistem. Pe Debian/Ubuntu:
 
 ```bash
-source .venv/bin/activate
-```
-
-Instalează dependențele de rulare — `PySide6` (interfața grafică), `openpyxl` (export Excel) și `curl_cffi` (cereri HTTP către serviciile de propagare și meteo):
-
-```bash
-python -m pip install -r requirements.txt
+sudo apt install libegl1 libgl1 libopengl0 libxkbcommon0 libxkbcommon-x11-0 libdbus-1-3 libfontconfig1 \
+    libx11-xcb1 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-image0 libxcb-render-util0 libxcb-shape0
 ```
 
 Pentru dezvoltare, instalează în plus uneltele de verificare folosite de CI (`ruff`, `mypy`):
@@ -107,6 +109,18 @@ python -m pip install -r requirements-dev.txt
 
 La prima pornire se creează `data/logbook.db` și `config.json`. Datele personale ale operatorului sunt stocate separat, în tabelul SQLite `operator_profile`, astfel încât nu sunt pierdute la actualizările aplicației.
 
+### Dacă aplicația nu pornește
+
+Lansatorul (`Launcher.bat` / `Launcher.sh`) așteaptă aplicația și, dacă ea se oprește cu eroare, afișează motivul; pe Windows, fereastra rămâne deschisă până apeși o tastă, ca mesajul să poată fi citit.
+
+| Ce vezi | Ce faci |
+|---|---|
+| `Lipsesc pachetele Python: …` | lansatorul încearcă singur să le instaleze; dacă nu reușește, rulează din nou comanda de [instalare rapidă](#instalare-rapidă-o-singură-comandă) |
+| `xcb-cursor0 or libxcb-cursor0 is needed…` / `Could not load the Qt platform plugin "xcb"` (Linux) | lipsesc biblioteci de sistem Qt: rulează din nou `install.sh`, sau instalează pachetele din secțiunea de mai sus |
+| `DLL load failed while importing QtCore` (Windows) | instalează Microsoft Visual C++ Redistributable: `winget install Microsoft.VCRedist.2015+.x64` |
+| `Could not create SSL/TLS secure channel` la comanda PowerShell | folosește comanda de mai sus exact cum e scrisă: prima ei parte activează TLS 1.2 |
+| `error: externally-managed-environment` (Linux) | ai rulat `pip` cu Python-ul sistemului; folosește `.venv/bin/python -m pip …` |
+
 ## Pornirea și actualizarea aplicației
 
 Pornește întotdeauna aplicația prin lansator:
@@ -117,7 +131,7 @@ python launcher.py
 
 Sau, mai simplu, prin lansatorul din rădăcina proiectului — `Launcher.bat` pe Windows, `./Launcher.sh` pe Linux/macOS. Amândouă folosesc automat Python-ul din `.venv`, dacă mediul virtual există, și cad înapoi pe Python-ul din sistem dacă nu, deci nu trebuie activat manual mediul virtual înainte de fiecare pornire.
 
-Nu porni direct `python main.py`: `main.py` rămâne punctul de intrare PySide6, dar este pornit automat de lansator. La fiecare pornire, lansatorul verifică actualizările ramurii Git curente și aplică numai actualizări fast-forward. Dacă `requirements.txt` s-a schimbat, dependențele sunt instalate în același mediu Python.
+Nu porni direct `python main.py`: `main.py` rămâne punctul de intrare PySide6, dar este pornit automat de lansator. La fiecare pornire, lansatorul verifică actualizările ramurii Git curente și aplică numai actualizări fast-forward. Dacă `requirements.txt` s-a schimbat, dependențele sunt instalate în același mediu Python. Înainte de pornire, lansatorul verifică și că `PySide6`, `openpyxl` și `curl_cffi` există, și le instalează dacă lipsesc — o instalare întreruptă se repară astfel singură. Apoi așteaptă aplicația până la închidere, ca o eventuală eroare de pornire să rămână vizibilă (vezi [Dacă aplicația nu pornește](#dacă-aplicația-nu-pornește)).
 
 Pentru actualizare automată, Git trebuie să fie instalat, iar proiectul trebuie obținut cu `git clone`, nu descărcat ca arhivă ZIP. Dacă nu există conexiune sau verificarea actualizărilor eșuează, aplicația pornește în continuare cu versiunea locală. Modificările locale nu sunt șterse, puse în stash sau suprascrise automat; o actualizare care nu poate fi aplicată fast-forward este anulată.
 

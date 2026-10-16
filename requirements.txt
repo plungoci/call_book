@@ -2,8 +2,10 @@
 # și reinstalate de `launcher.py` după fiecare actualizare a acestui fișier.
 # Aceleași versiuni sunt declarate și în `pyproject.toml`.
 
-# Interfața grafică: PySide6.QtWidgets, PySide6.QtCore, PySide6.QtGui.
-PySide6>=6.7,<7
+# Interfața grafică: PySide6.QtWidgets, PySide6.QtCore, PySide6.QtGui. Pachetul
+# Essentials conține exact aceste module (importate tot ca `PySide6`), fără
+# QtWebEngine & co. din pachetul complet `PySide6` — ~85 MB în loc de ~260 MB.
+PySide6-Essentials>=6.7,<7
 
 # Exportul jurnalului în format Excel (.xlsx).
 openpyxl>=3.1,<4

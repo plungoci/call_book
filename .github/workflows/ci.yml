@@ -38,3 +38,55 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: python -m unittest discover -s tests -v
+
+  # Rulează scripturile de instalare de la cap la coadă, pe un sistem curat, din
+  # copia verificată acum (nu din `main`), apoi pornește aplicația prin lansator.
+  install-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run scripts/install.sh
+        env:
+          CALL_BOOK_REPOSITORY: ${{ github.workspace }}
+          CALL_BOOK_BRANCH: ci-install
+          CALL_BOOK_HOME: ${{ runner.temp }}/call_book
+          CALL_BOOK_NO_START: "1"
+        run: |
+          git branch -f ci-install HEAD
+          bash scripts/install.sh
+
+      - name: Start the application on X11
+        run: |
+          sudo apt-get install -y xvfb
+          # Aplicația rulează până e oprită; codul 124 (timeout) înseamnă că a pornit.
+          status=0
+          xvfb-run -a timeout 20 "$RUNNER_TEMP/call_book/Launcher.sh" || status=$?
+          test "$status" -eq 124
+
+  install-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Windows PowerShell 5.1 (`shell: powershell`), ca pe un calculator obișnuit;
+      # scriptul e încărcat la fel ca de `irm | iex`, ca text UTF-8.
+      - name: Run scripts/install.ps1
+        shell: powershell
+        run: |
+          git branch -f ci-install HEAD
+          $script = [scriptblock]::Create((Get-Content -Raw -Encoding UTF8 scripts\install.ps1))
+          & $script -Repository $env:GITHUB_WORKSPACE -Branch ci-install -InstallPath "$env:RUNNER_TEMP\call_book" -NoShortcut -NoStart
+
+      - name: Start the application
+        shell: powershell
+        run: |
+          $env:QT_QPA_PLATFORM = 'offscreen'
+          $root = "$env:RUNNER_TEMP\call_book"
+          $app = Start-Process -FilePath "$root\.venv\Scripts\python.exe" -ArgumentList "$root\launcher.py" -WorkingDirectory $root -PassThru -NoNewWindow
+          # Fără un handle ținut deschis, ExitCode rămâne gol după ieșire.
+          $null = $app.Handle
+          Start-Sleep -Seconds 20
+          if ($app.HasExited) { throw "Aplicația s-a oprit cu codul $($app.ExitCode)." }
+          Get-CimInstance Win32_Process -Filter "ParentProcessId = $($app.Id)" | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+          Stop-Process -Id $app.Id -Force

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -89,6 +90,25 @@ class InstallScriptTests(unittest.TestCase):
             ["bash", "-n", str(INSTALL_SH)], capture_output=True, text=True, check=False, timeout=30
         )
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_linux_installer_runs_only_after_being_read_completely(self) -> None:
+        # Cu `curl ... | bash`, o comandă care citește din stdin ar înghiți restul
+        # scriptului; de aceea tot codul stă în `main`, apelată pe ultimul rând.
+        lines = [line for line in INSTALL_SH.read_text(encoding="utf-8").splitlines() if line.strip()]
+        self.assertEqual(lines[-1], 'main "$@"')
+
+    def test_installers_check_the_qt_xcb_cursor_library(self) -> None:
+        # Fără libxcb-cursor, Qt 6.5+ nu poate deschide nicio fereastră pe X11.
+        self.assertIn("libxcb-cursor.so.0", INSTALL_SH.read_text(encoding="utf-8"))
+
+    def test_windows_installer_passes_no_double_quotes_to_python(self) -> None:
+        # Windows PowerShell 5.1 nu escapează ghilimelele duble din argumentele
+        # unui program extern: `python -c 'print("x")'` ajunge la Python ca
+        # `print(x)`. Codul pasat cu `-c` trebuie să folosească apostrofuri.
+        snippets = re.findall(r"'-c',\s*(['\"])(.*?)\1", INSTALL_PS1.read_text(encoding="utf-8"))
+        self.assertTrue(snippets)
+        for _, code in snippets:
+            self.assertNotIn('"', code)
 
     @unittest.skipUnless(shutil.which("sh"), "shell POSIX indisponibil")
     def test_launcher_is_valid_posix_shell(self) -> None:
