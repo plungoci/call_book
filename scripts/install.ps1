@@ -98,7 +98,9 @@ function Get-PythonVersion {
     $previous = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        $output = & $Executable @($Arguments + @('-c', 'import sys; print("%d.%d" % sys.version_info[:2])')) 2>$null
+        # Fără ghilimele duble în cod: Windows PowerShell 5.1 nu le escapează când
+        # le transmite unui program extern, iar Python ar primi cod invalid.
+        $output = & $Executable @($Arguments + @('-c', "import sys; print('%d.%d' % sys.version_info[:2])")) 2>$null
         if ($LASTEXITCODE -ne 0 -or -not $output) { return $null }
         return [Version](@($output)[0]).Trim()
     } catch {

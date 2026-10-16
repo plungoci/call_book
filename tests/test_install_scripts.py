@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -99,6 +100,15 @@ class InstallScriptTests(unittest.TestCase):
     def test_installers_check_the_qt_xcb_cursor_library(self) -> None:
         # Fără libxcb-cursor, Qt 6.5+ nu poate deschide nicio fereastră pe X11.
         self.assertIn("libxcb-cursor.so.0", INSTALL_SH.read_text(encoding="utf-8"))
+
+    def test_windows_installer_passes_no_double_quotes_to_python(self) -> None:
+        # Windows PowerShell 5.1 nu escapează ghilimelele duble din argumentele
+        # unui program extern: `python -c 'print("x")'` ajunge la Python ca
+        # `print(x)`. Codul pasat cu `-c` trebuie să folosească apostrofuri.
+        snippets = re.findall(r"'-c',\s*(['\"])(.*?)\1", INSTALL_PS1.read_text(encoding="utf-8"))
+        self.assertTrue(snippets)
+        for _, code in snippets:
+            self.assertNotIn('"', code)
 
     @unittest.skipUnless(shutil.which("sh"), "shell POSIX indisponibil")
     def test_launcher_is_valid_posix_shell(self) -> None:
