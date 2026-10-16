@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import shutil
 import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
+from typing import TextIO
 
 GIT_NETWORK_TIMEOUT = 20
 GIT_COMMAND_TIMEOUT = 10
@@ -303,6 +305,22 @@ def start_application(project_dir: Path) -> int:
     return 0
 
 
+def configure_output(stream: TextIO) -> None:
+    """Pregătește ieșirea pentru mesajele lansatorului, cu diacritice cu tot.
+
+    Mesajele trebuie să apară înaintea ieșirii lui pip și a aplicației, chiar
+    și când ieșirea e redirecționată. Tot atunci, pe Windows, Python scrie în
+    codarea ANSI (cp1252), în care „ă” nu există: primul mesaj ar opri
+    lansatorul cu UnicodeEncodeError. Într-o consolă reală nu e cazul.
+    """
+    if not isinstance(stream, io.TextIOWrapper):
+        return
+    if stream.isatty():
+        stream.reconfigure(line_buffering=True)
+    else:
+        stream.reconfigure(line_buffering=True, encoding="utf-8", errors="replace")
+
+
 def main() -> int:
     """Actualizează opțional, verifică dependențele și pornește aplicația.
 
@@ -310,10 +328,7 @@ def main() -> int:
     deschisă când acesta nu este 0.
     """
     project_dir = Path(__file__).resolve().parent
-    # Mesajele lansatorului trebuie să apară înaintea ieșirii lui pip și a
-    # aplicației, chiar și când consola este redirecționată într-un fișier.
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(line_buffering=True)
+    configure_output(sys.stdout)
     check_for_updates(project_dir)
     if not ensure_requirements(project_dir):
         return 1

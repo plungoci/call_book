@@ -84,6 +84,8 @@ jobs:
           $env:QT_QPA_PLATFORM = 'offscreen'
           $root = "$env:RUNNER_TEMP\call_book"
           $app = Start-Process -FilePath "$root\.venv\Scripts\python.exe" -ArgumentList "$root\launcher.py" -WorkingDirectory $root -PassThru -NoNewWindow
+          # Fără un handle ținut deschis, ExitCode rămâne gol după ieșire.
+          $null = $app.Handle
           Start-Sleep -Seconds 20
           if ($app.HasExited) { throw "Aplicația s-a oprit cu codul $($app.ExitCode)." }
           Get-CimInstance Win32_Process -Filter "ParentProcessId = $($app.Id)" | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }

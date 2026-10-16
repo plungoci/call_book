@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import subprocess
 from contextlib import redirect_stdout
-from io import StringIO
+from io import BytesIO, StringIO, TextIOWrapper
 from pathlib import Path
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
@@ -357,3 +357,22 @@ class StartApplicationTests(TestCase):
     def test_an_unstartable_application_is_a_failure(self, _: MagicMock) -> None:
         with redirect_stdout(StringIO()):
             self.assertEqual(launcher.start_application(self.project_dir), 1)
+
+
+class OutputTests(TestCase):
+    """Mesajele cu diacritice nu trebuie să oprească lansatorul."""
+
+    def test_redirected_ansi_output_accepts_romanian_text(self) -> None:
+        # Așa arată stdout pe Windows când ieșirea merge într-un pipe sau fișier.
+        raw = BytesIO()
+        stream = TextIOWrapper(raw, encoding="cp1252")
+        launcher.configure_output(stream)
+        print("Verific actualizările...", file=stream)
+        stream.flush()
+        self.assertEqual(raw.getvalue().decode("utf-8").strip(), "Verific actualizările...")
+
+    def test_streams_that_cannot_be_reconfigured_are_left_alone(self) -> None:
+        stream = StringIO()
+        launcher.configure_output(stream)
+        print("ă", file=stream)
+        self.assertEqual(stream.getvalue(), "ă\n")
